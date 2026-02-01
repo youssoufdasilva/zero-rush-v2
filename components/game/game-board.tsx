@@ -6,6 +6,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -39,7 +40,7 @@ export interface GameSettings {
   clearAfterSubmit: boolean;
   controlsStyle: "text-icons" | "icons-only";
   historyPlacement: "inline" | "drawer";
-  cardScaling: "scale" | "scroll";
+  cardScaling: "auto" | "scale" | "scroll";
   soundEffects: boolean;
 }
 
@@ -51,7 +52,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   clearAfterSubmit: true,
   controlsStyle: "text-icons",
   historyPlacement: "drawer",
-  cardScaling: "scale",
+  cardScaling: "auto",
   soundEffects: true,
 };
 const SETTINGS_STORAGE_KEY = "zero-rush.gameSettings";
@@ -69,6 +70,7 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [shakeSubmit, setShakeSubmit] = useState(false);
   const [flashHistory, setFlashHistory] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const submitButtonRef = useRef<HTMLButtonElement>(null);
   const autoSubmitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevCanSubmitRef = useRef(false);
@@ -96,6 +98,14 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
     canSubmit,
     setMaxHistoryLength,
   } = useGame(difficulty);
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Show victory modal when puzzle is completed
   useEffect(() => {
@@ -145,6 +155,12 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 150,
+        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -316,8 +332,21 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
 
   // Determine card count for scaling
   const cardCount = handCards.length + arrangementCards.length;
-  const shouldScaleCards = settings.cardScaling === "scale" && cardCount >= 8;
-  const shouldScrollCards = settings.cardScaling === "scroll" && cardCount >= 8;
+
+  // Auto mode: scroll on mobile, scale on desktop for 8+ cards
+  let shouldScaleCards = false;
+  let shouldScrollCards = false;
+
+  if (cardCount >= 8) {
+    if (settings.cardScaling === "auto") {
+      shouldScrollCards = isMobile;
+      shouldScaleCards = !isMobile;
+    } else if (settings.cardScaling === "scale") {
+      shouldScaleCards = true;
+    } else if (settings.cardScaling === "scroll") {
+      shouldScrollCards = true;
+    }
+  }
 
   return (
     <>
@@ -464,8 +493,11 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
             >
               <div
                 className={cn(
-                  "flex flex-wrap justify-center gap-2 sm:gap-3 p-4 rounded-2xl bg-muted/30 border w-full",
-                  shouldScaleCards ? "min-h-[90px]" : "min-h-[120px]"
+                  "flex gap-2 sm:gap-3 p-3 sm:p-4 rounded-2xl bg-muted/30 border w-full",
+                  shouldScrollCards
+                    ? "overflow-x-auto scrollbar-thin justify-start"
+                    : "flex-wrap justify-center",
+                  shouldScaleCards ? "min-h-[80px]" : "min-h-[100px] sm:min-h-[120px]"
                 )}
               >
                 {arrangementCards.length === 0 ? (

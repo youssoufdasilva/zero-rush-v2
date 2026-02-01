@@ -204,3 +204,22 @@
   pointer-events: none;
   z-index: 100;
 }
+
+/* Touch handling for drag and drop */
+[data-dnd-draggable] {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Scrollbar styling for horizontal scroll mode */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  height: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}

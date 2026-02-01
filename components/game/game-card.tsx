@@ -40,6 +40,7 @@ export function GameCard({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+    touchAction: draggable ? 'none' as const : undefined,
   };
 
   const operatorSymbol = OPERATOR_DISPLAY[card.operator];
@@ -60,14 +61,15 @@ export function GameCard({
       {...attributes}
       {...(draggable ? listeners : {})}
       onClick={handleClick}
+      data-dnd-draggable={draggable || undefined}
       className={cn(
         "relative flex flex-col items-center justify-center",
         "rounded-xl border-2 shadow-lg",
         "bg-card text-card-foreground",
         "select-none",
         "transition-all duration-150",
-        // Size variants
-        isSmall ? "w-12 h-16 sm:w-14 sm:h-18" : "w-16 h-20 sm:w-20 sm:h-24",
+        // Size variants - minimum 44px (w-11) for touch targets
+        isSmall ? "w-11 h-14 sm:w-14 sm:h-18" : "w-16 h-20 sm:w-20 sm:h-24",
         // Cursor based on interaction mode
         draggable && !disabled && "cursor-grab active:cursor-grabbing",
         onClick &&
@@ -81,7 +83,7 @@ export function GameCard({
         card.operator === "*" && "border-violet-500 dark:border-violet-400",
         card.operator === "÷" && "border-amber-500 dark:border-amber-400",
         // States
-        isDragging && "opacity-50 scale-105 shadow-xl z-50",
+        isDragging && "opacity-70 scale-110 shadow-2xl z-50 ring-2 ring-primary/50",
         disabled && "opacity-60 cursor-not-allowed"
       )}
     >

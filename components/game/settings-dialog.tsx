@@ -144,11 +144,12 @@ export function SettingsDialog({ settings, onSettingsChange }: SettingsDialogPro
                 description="How to handle many cards in hand"
                 value={settings.cardScaling}
                 options={[
-                  { value: "scale", label: "Scale Down" },
-                  { value: "scroll", label: "Horizontal Scroll" },
+                  { value: "auto", label: "Auto" },
+                  { value: "scale", label: "Scale" },
+                  { value: "scroll", label: "Scroll" },
                 ]}
                 onChange={(value) =>
-                  onSettingsChange({ ...settings, cardScaling: value as "scale" | "scroll" })
+                  onSettingsChange({ ...settings, cardScaling: value as "auto" | "scale" | "scroll" })
                 }
               />
 

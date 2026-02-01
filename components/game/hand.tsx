@@ -95,8 +95,8 @@ function HandCard({
         "hover:scale-105 hover:shadow-lg",
         "active:scale-95",
         "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-        // Size variants
-        isSmall ? "w-10 h-14 sm:w-12 sm:h-16" : "w-14 h-18 sm:w-16 sm:h-20",
+        // Size variants - minimum 44px (w-11) for touch targets
+        isSmall ? "w-11 h-14 sm:w-12 sm:h-16" : "w-14 h-18 sm:w-16 sm:h-20",
         // Operator-based coloring
         card.operator === "+" && "border-emerald-500 dark:border-emerald-400",
         card.operator === "-" && "border-rose-500 dark:border-rose-400",

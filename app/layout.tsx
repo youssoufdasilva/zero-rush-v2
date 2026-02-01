@@ -20,6 +20,13 @@ export const metadata: Metadata = {
   description: "Find the lowest (dusk) and highest (dawn) values by arranging cards",
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 // Inline script to prevent theme flash - runs before React hydrates
 const themeScript = `
 (function() {
