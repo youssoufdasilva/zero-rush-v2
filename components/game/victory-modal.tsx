@@ -4,10 +4,11 @@ import { useEffect, useCallback, useState } from "react";
 import confetti from "canvas-confetti";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Difficulty } from "@/lib/types/game";
+import type { Card, Difficulty, SharePreset } from "@/lib/types/game";
 import type { Submission } from "@/lib/hooks/use-game";
 import { MiniCard } from "./submission-history";
 import { OPERATOR_DISPLAY } from "@/lib/game/constants";
+import { generateShareMessage, getPresetLabel } from "@/lib/share-messages";
 
 // Confetti colors for canvas-confetti
 const CONFETTI_COLORS = [
@@ -93,7 +94,11 @@ export interface VictoryModalProps {
   dawnSubmission?: Submission;
   /** Current difficulty level */
   difficulty?: Difficulty;
+  /** The original puzzle cards (for sharing) */
+  puzzleCards?: Card[];
 }
+
+const SHARE_PRESETS: SharePreset[] = ["challenge", "teaser", "wordle"];
 
 export function VictoryModal({
   isOpen,
@@ -104,19 +109,59 @@ export function VictoryModal({
   onNewPuzzle,
   duskSubmission,
   dawnSubmission,
+  difficulty = "medium",
+  puzzleCards,
 }: VictoryModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [shareText, setShareText] = useState("");
+  const [selectedPreset, setSelectedPreset] = useState<SharePreset>("challenge");
+
+  // Generate share text based on selected preset
+  const updateShareText = useCallback(
+    (preset: SharePreset) => {
+      if (!puzzleCards || puzzleCards.length === 0) {
+        // Fallback to old style if no puzzle cards
+        if (duskSubmission && dawnSubmission) {
+          setShareText(generateShareText(duskSubmission, dawnSubmission, attempts));
+        }
+        return;
+      }
+
+      const message = generateShareMessage(preset, {
+        cards: puzzleCards,
+        difficulty,
+        duskValue,
+        dawnValue,
+        foundDusk: !!duskSubmission,
+        foundDawn: !!dawnSubmission,
+        attempts,
+        duskArrangement: duskSubmission?.arrangement,
+        dawnArrangement: dawnSubmission?.arrangement,
+      });
+      setShareText(message);
+    },
+    [puzzleCards, difficulty, duskValue, dawnValue, duskSubmission, dawnSubmission, attempts]
+  );
 
   // Initialize share text when modal opens
   useEffect(() => {
-    if (isOpen && duskSubmission && dawnSubmission) {
-      setShareText(generateShareText(duskSubmission, dawnSubmission, attempts));
+    if (isOpen) {
+      updateShareText(selectedPreset);
       setIsEditing(false);
       setCopied(false);
     }
-  }, [isOpen, duskSubmission, dawnSubmission, attempts]);
+  }, [isOpen, selectedPreset, updateShareText]);
+
+  // Update share text when preset changes
+  const handlePresetChange = useCallback(
+    (preset: SharePreset) => {
+      setSelectedPreset(preset);
+      updateShareText(preset);
+      setIsEditing(false);
+    },
+    [updateShareText]
+  );
 
   // Trigger canvas confetti when modal opens
   useEffect(() => {
@@ -256,6 +301,31 @@ export function VictoryModal({
           {duskSubmission && dawnSubmission && (
             <div className="mb-6">
               <div className="border-t border-border pt-4">
+                {/* Share preset selector */}
+                {puzzleCards && puzzleCards.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-xs text-muted-foreground text-center mb-2">
+                      Share as challenge
+                    </div>
+                    <div className="flex gap-1 p-1 rounded-lg bg-muted">
+                      {SHARE_PRESETS.map((preset) => (
+                        <button
+                          key={preset}
+                          onClick={() => handlePresetChange(preset)}
+                          className={cn(
+                            "flex-1 px-3 py-1.5 rounded-md text-sm transition-colors",
+                            selectedPreset === preset
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {getPresetLabel(preset)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Share buttons */}
                 <div className="flex items-center justify-center gap-2 mb-3">
                   <button

@@ -9,3 +9,6 @@ export { Hand } from "./hand";
 export { SubmissionHistory } from "./submission-history";
 export { HomeScreen } from "./home-screen";
 export { VictoryModal, VictoryBanner } from "./victory-modal";
+export { PuzzleHistory } from "./puzzle-history";
+export { PuzzleHistoryItem } from "./puzzle-history-item";
+export { SharedPuzzleGame } from "./shared-puzzle-game";

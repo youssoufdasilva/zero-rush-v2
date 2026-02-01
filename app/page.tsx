@@ -1,31 +1,48 @@
 "use client";
 
 import { useState } from "react";
-import type { Difficulty } from "@/lib/types/game";
+import type { Card, Difficulty } from "@/lib/types/game";
 import { GameBoard } from "@/components/game";
 import { HomeScreen } from "@/components/game/home-screen";
+import { PuzzleHistory } from "@/components/game/puzzle-history";
+
+type PageState =
+  | { screen: "home" }
+  | { screen: "playing"; difficulty: Difficulty; providedCards?: Card[] }
+  | { screen: "history" };
 
 export default function Page() {
-  const [gameState, setGameState] = useState<
-    { playing: false } | { playing: true; difficulty: Difficulty }
-  >({
-    playing: false,
-  });
+  const [pageState, setPageState] = useState<PageState>({ screen: "home" });
 
   const handleStart = (difficulty: Difficulty) => {
-    setGameState({ playing: true, difficulty });
+    setPageState({ screen: "playing", difficulty });
   };
 
   const handleBack = () => {
-    setGameState({ playing: false });
+    setPageState({ screen: "home" });
+  };
+
+  const handleHistory = () => {
+    setPageState({ screen: "history" });
+  };
+
+  const handleResolve = (cards: Card[], difficulty: Difficulty) => {
+    setPageState({ screen: "playing", difficulty, providedCards: cards });
   };
 
   return (
     <main className="min-h-screen">
-      {gameState.playing ? (
-        <GameBoard difficulty={gameState.difficulty} onBack={handleBack} />
+      {pageState.screen === "playing" ? (
+        <GameBoard
+          difficulty={pageState.difficulty}
+          onBack={handleBack}
+          providedCards={pageState.providedCards}
+          puzzleSource={pageState.providedCards ? "shared" : "generated"}
+        />
+      ) : pageState.screen === "history" ? (
+        <PuzzleHistory onBack={handleBack} onResolve={handleResolve} />
       ) : (
-        <HomeScreen onStart={handleStart} />
+        <HomeScreen onStart={handleStart} onHistory={handleHistory} />
       )}
     </main>
   );

@@ -9,12 +9,14 @@ import { cn } from "@/lib/utils";
 export interface HomeScreenProps {
   /** Callback when difficulty is selected and player starts */
   onStart: (difficulty: Difficulty) => void;
+  /** Callback to open puzzle history */
+  onHistory?: () => void;
 }
 
 const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard", "challenger"];
 const LAST_DIFFICULTY_KEY = "zero-rush.lastDifficulty";
 
-export function HomeScreen({ onStart }: HomeScreenProps) {
+export function HomeScreen({ onStart, onHistory }: HomeScreenProps) {
   const [selectedDifficulty, setSelectedDifficulty] =
     useState<Difficulty>("medium");
 
@@ -103,13 +105,26 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
       </div>
 
       {/* Start Button */}
-      <Button
-        onClick={handleStart}
-        size="lg"
-        className="min-w-[200px] text-lg h-14"
-      >
-        Start Game
-      </Button>
+      <div className="flex flex-col items-center gap-3">
+        <Button
+          onClick={handleStart}
+          size="lg"
+          className="min-w-[200px] text-lg h-14"
+        >
+          Start Game
+        </Button>
+
+        {onHistory && (
+          <Button
+            variant="outline"
+            onClick={onHistory}
+            className="flex items-center gap-2"
+          >
+            <HistoryIcon className="w-4 h-4" />
+            <span>Puzzle History</span>
+          </Button>
+        )}
+      </div>
 
       {/* Quick info */}
       <div className="text-center text-sm text-muted-foreground max-w-md space-y-3">
@@ -132,5 +147,22 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+function HistoryIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 8v4l3 3M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+    </svg>
   );
 }

@@ -105,6 +105,16 @@ export function SettingsDialog({ settings, onSettingsChange }: SettingsDialogPro
                 }
               />
 
+              {/* Auto-save history toggle */}
+              <SettingToggle
+                label="Auto-Save History"
+                description="Automatically save completed puzzles to history"
+                checked={settings.autoSaveHistory}
+                onChange={(checked) =>
+                  onSettingsChange({ ...settings, autoSaveHistory: checked })
+                }
+              />
+
               {/* Display Section */}
               <div className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mt-6 mb-2">
                 Display

@@ -20,6 +20,7 @@ import {
 
 import type { Difficulty, AutoOrgMode, Card } from "@/lib/types/game";
 import { useGame } from "@/lib/hooks/use-game";
+import { usePuzzleHistory, createHistoryEntry } from "@/lib/hooks/use-puzzle-history";
 import { GameCard } from "./game-card";
 import { Hand } from "./hand";
 import { TargetDisplay } from "./target-display";
@@ -44,6 +45,7 @@ export interface GameSettings {
   useCardSlots: boolean;
   autoOrganization: AutoOrgMode;
   enableHandDrag: boolean;
+  autoSaveHistory: boolean;
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -58,6 +60,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   useCardSlots: true,
   autoOrganization: "hand",
   enableHandDrag: false,
+  autoSaveHistory: true,
 };
 const SETTINGS_STORAGE_KEY = "zero-rush.gameSettings";
 
@@ -66,9 +69,21 @@ export interface GameBoardProps {
   difficulty: Difficulty;
   /** Callback to go back to home screen */
   onBack: () => void;
+  /** Provided cards (for shared puzzles) */
+  providedCards?: Card[];
+  /** Source of the puzzle */
+  puzzleSource?: "generated" | "shared";
+  /** URL the puzzle was shared from */
+  sharedFromUrl?: string;
 }
 
-export function GameBoard({ difficulty, onBack }: GameBoardProps) {
+export function GameBoard({
+  difficulty,
+  onBack,
+  providedCards,
+  puzzleSource = "generated",
+  sharedFromUrl,
+}: GameBoardProps) {
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
   const [showVictoryModal, setShowVictoryModal] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -81,12 +96,15 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
   const prevCompleteRef = useRef(false);
 
   const { play } = useSoundEffects(settings.soundEffects);
+  const { addEntry: addHistoryEntry } = usePuzzleHistory();
+  const historySavedRef = useRef(false);
 
   const {
     handCards,
     arrangementCards,
     handSlots,
     tableSlots,
+    puzzleCards,
     puzzleResult,
     foundDusk,
     foundDawn,
@@ -110,7 +128,7 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
     removeFromTableAtSlot,
     swapWithinTable,
     swapWithinHand,
-  } = useGame(difficulty);
+  } = useGame({ difficulty, providedCards });
 
   // Detect mobile viewport
   useEffect(() => {
@@ -126,6 +144,55 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
       setShowVictoryModal(true);
     }
   }, [isComplete]);
+
+  // Save to history when puzzle is completed
+  useEffect(() => {
+    if (isComplete && settings.autoSaveHistory && !historySavedRef.current) {
+      historySavedRef.current = true;
+
+      const duskSubmission = submissions.find((s) => s.isDusk);
+      const dawnSubmission = submissions.find((s) => s.isDawn);
+
+      const entry = createHistoryEntry({
+        cards: puzzleCards,
+        difficulty,
+        attempts,
+        duskValue: puzzleResult.dusk.result,
+        dawnValue: puzzleResult.dawn.result,
+        foundDusk,
+        foundDawn,
+        duskSubmission: duskSubmission
+          ? { arrangement: duskSubmission.arrangement, result: duskSubmission.result }
+          : undefined,
+        dawnSubmission: dawnSubmission
+          ? { arrangement: dawnSubmission.arrangement, result: dawnSubmission.result }
+          : undefined,
+        source: puzzleSource,
+        sharedFromUrl,
+      });
+
+      addHistoryEntry(entry);
+    }
+  }, [
+    isComplete,
+    settings.autoSaveHistory,
+    puzzleCards,
+    difficulty,
+    attempts,
+    puzzleResult.dusk.result,
+    puzzleResult.dawn.result,
+    foundDusk,
+    foundDawn,
+    submissions,
+    puzzleSource,
+    sharedFromUrl,
+    addHistoryEntry,
+  ]);
+
+  // Reset history saved flag when generating new puzzle
+  useEffect(() => {
+    historySavedRef.current = false;
+  }, [puzzleCards]);
 
   // Sync settings with hook
   useEffect(() => {
@@ -404,6 +471,7 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
         duskSubmission={submissions.find((s) => s.isDusk)}
         dawnSubmission={submissions.find((s) => s.isDawn)}
         difficulty={difficulty}
+        puzzleCards={puzzleCards}
       />
 
       {/* History Drawer (when in drawer mode) */}

@@ -292,6 +292,61 @@ export interface Transaction {
 // Daily Puzzle Types
 // =============================================================================
 
+// =============================================================================
+// Puzzle Sharing & History Types
+// =============================================================================
+
+/** Share message preset types */
+export type SharePreset = 'challenge' | 'teaser' | 'wordle';
+
+/** A submission stored in puzzle history */
+export interface HistorySubmission {
+  /** The card arrangement that was submitted */
+  arrangement: Card[];
+  /** The evaluated result */
+  result: number;
+  /** Whether this matched dusk */
+  isDusk: boolean;
+  /** Whether this matched dawn */
+  isDawn: boolean;
+}
+
+/** An entry in the puzzle history */
+export interface PuzzleHistoryEntry {
+  /** Unique ID for this entry */
+  id: string;
+  /** The cards in this puzzle */
+  cards: Card[];
+  /** Canonical signature for the puzzle */
+  signature: string;
+  /** Difficulty level */
+  difficulty: Difficulty;
+  /** Number of attempts taken */
+  attempts: number;
+  /** Submissions that found dusk/dawn */
+  submissions: HistorySubmission[];
+  /** When the puzzle was completed */
+  completedAt: number;
+  /** The dusk value (lowest) */
+  duskValue: number;
+  /** The dawn value (highest) */
+  dawnValue: number;
+  /** Whether dusk was found */
+  foundDusk: boolean;
+  /** Whether dawn was found */
+  foundDawn: boolean;
+  /** Whether this puzzle is favorited */
+  isFavorite: boolean;
+  /** Source of the puzzle */
+  source: 'generated' | 'shared';
+  /** Original URL if puzzle was shared */
+  sharedFromUrl?: string;
+}
+
+// =============================================================================
+// Daily Puzzle Types
+// =============================================================================
+
 /** Daily puzzle entry */
 export interface DailyPuzzle {
   id: string;

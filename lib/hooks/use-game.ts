@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import type { Card, Difficulty, PuzzleResult, Slot, AutoOrgMode } from "@/lib/types/game";
-import { findGoodPuzzleForDifficulty } from "@/lib/game/generate";
+import { findGoodPuzzleForDifficulty, generateAnswers } from "@/lib/game/generate";
 import { evaluate, isValidAnswer, cardToString } from "@/lib/game/evaluate";
 import { DIFFICULTY_CONFIG } from "@/lib/game/constants";
 
@@ -61,6 +61,8 @@ export interface GameState {
 }
 
 export interface UseGameReturn extends GameState {
+  /** Original puzzle cards (for sharing) */
+  puzzleCards: Card[];
   /** Generate a new puzzle */
   generateNewPuzzle: () => void;
   /** Add a card from hand to arrangement */
@@ -109,15 +111,41 @@ function createInitialPuzzle(difficulty: Difficulty): {
   return { cards: puzzle, puzzleResult: result };
 }
 
-export function useGame(initialDifficulty: Difficulty = "medium"): UseGameReturn {
+function createPuzzleFromCards(cards: Card[]): {
+  cards: Card[];
+  puzzleResult: PuzzleResult;
+} {
+  const puzzleResult = generateAnswers(cards);
+  return { cards, puzzleResult };
+}
+
+export interface UseGameOptions {
+  /** Initial difficulty level */
+  difficulty?: Difficulty;
+  /** Provided cards (for shared puzzles) */
+  providedCards?: Card[];
+}
+
+export function useGame(initialDifficultyOrOptions: Difficulty | UseGameOptions = "medium"): UseGameReturn {
+  // Handle both old signature (just difficulty) and new options object
+  const options: UseGameOptions =
+    typeof initialDifficultyOrOptions === "string"
+      ? { difficulty: initialDifficultyOrOptions }
+      : initialDifficultyOrOptions;
+
+  const initialDifficulty = options.difficulty ?? "medium";
+  const providedCards = options.providedCards;
+
   const [difficulty] = useState<Difficulty>(initialDifficulty);
   const [maxHistoryLength, setMaxHistoryLength] = useState(10);
   const [autoOrgMode, setAutoOrgMode] = useState<AutoOrgMode>("both");
   const [useCardSlots, setUseCardSlots] = useState(true);
 
-  // Initialize puzzle
+  // Initialize puzzle - use provided cards if available
   const [puzzleData, setPuzzleData] = useState(() =>
-    createInitialPuzzle(initialDifficulty)
+    providedCards
+      ? createPuzzleFromCards(providedCards)
+      : createInitialPuzzle(initialDifficulty)
   );
 
   // Slot-based state (may contain nulls when auto-org is off)
@@ -415,6 +443,7 @@ export function useGame(initialDifficulty: Difficulty = "medium"): UseGameReturn
     handSlots,
     tableSlots,
     difficulty,
+    puzzleCards: puzzleData.cards,
     puzzleResult: puzzleData.puzzleResult,
     foundDusk,
     foundDawn,
