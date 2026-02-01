@@ -181,8 +181,37 @@
 **Date**: Jan 2026
 
 ### D033: Card Rendering
-**Decision**: Text-based cards (no images)  
-**Rationale**: Simpler to implement, more accessible, works better across themes.  
+**Decision**: Text-based cards (no images)
+**Rationale**: Simpler to implement, more accessible, works better across themes.
+**Date**: Jan 2026
+
+### D034: Settings System
+**Decision**: 9 configurable options persisted to localStorage under `zero-rush-settings`
+**Options**: showTargetValues, highlightMatches, autoSubmit, soundEffects, clearAfterSubmit, controlsStyle, historyPlacement, cardScaling, maxHistoryLength
+**Rationale**: Offline-first approach. No backend needed for settings. Immediate persistence on change.
+**Date**: Jan 2026
+
+### D035: Sound Effects Implementation
+**Decision**: Web Audio API with lazy AudioContext creation, client-only
+**10 sound types**: cardAdd, cardRemove, submitValid, submitInvalid, duplicate, duskFound, dawnFound, puzzleComplete, clear, newPuzzle
+**Rationale**: No asset files needed. SSR-safe. Customizable frequencies and durations. Multi-step tones for important events.
+**Date**: Jan 2026
+
+### D036: Submission History
+**Decision**: Track submissions with signature-based duplicate detection. Flash feedback on duplicates.
+**Display options**: Inline (below board) or drawer (side panel) via settings
+**Rationale**: Prevents wasted attempts on duplicate arrangements. Visual feedback helps player learn.
+**Date**: Jan 2026
+
+### D037: Mobile Drag-and-Drop
+**Decision**: `@dnd-kit` with TouchSensor (150ms activation delay) + PointerSensor
+**Rationale**: 150ms delay prevents accidental drags during scrolling. dnd-kit provides accessible, performant drag-and-drop.
+**Date**: Jan 2026
+
+### D038: Card Scaling for 8+ Cards
+**Decision**: Three modes configurable in settings: auto (detect device), scale (shrink cards), scroll (horizontal overflow)
+**Auto behavior**: Scroll on touch devices, scale on desktop
+**Rationale**: Mobile screens benefit from scrolling (easier tap targets). Desktop has room to scale.
 **Date**: Jan 2026
 
 ---

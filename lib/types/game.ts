@@ -18,6 +18,12 @@ export interface Card {
 /** String representation of a card (e.g., "+3", "÷4") */
 export type CardString = `${Operator}${number}`;
 
+/** A slot that can contain a card or be empty */
+export type Slot = Card | null;
+
+/** Auto-organization mode for hand/table zones */
+export type AutoOrgMode = "off" | "hand" | "table" | "both";
+
 // =============================================================================
 // Puzzle Types
 // =============================================================================

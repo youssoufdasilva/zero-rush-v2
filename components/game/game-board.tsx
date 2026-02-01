@@ -18,15 +18,15 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-import type { Difficulty } from "@/lib/types/game";
+import type { Difficulty, AutoOrgMode, Card } from "@/lib/types/game";
 import { useGame } from "@/lib/hooks/use-game";
 import { GameCard } from "./game-card";
 import { Hand } from "./hand";
 import { TargetDisplay } from "./target-display";
-import { GameControls } from "./game-controls";
 import { SettingsDialog } from "./settings-dialog";
 import { SubmissionHistory } from "./submission-history";
 import { VictoryModal, VictoryBanner } from "./victory-modal";
+import { SlotGrid } from "./slot-grid";
 import { cardToString } from "@/lib/game/evaluate";
 import { OPERATOR_DISPLAY } from "@/lib/game/constants";
 import { cn } from "@/lib/utils";
@@ -40,8 +40,9 @@ export interface GameSettings {
   clearAfterSubmit: boolean;
   controlsStyle: "text-icons" | "icons-only";
   historyPlacement: "inline" | "drawer";
-  cardScaling: "auto" | "scale" | "scroll";
   soundEffects: boolean;
+  useCardSlots: boolean;
+  autoOrganization: AutoOrgMode;
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -52,8 +53,9 @@ const DEFAULT_SETTINGS: GameSettings = {
   clearAfterSubmit: true,
   controlsStyle: "text-icons",
   historyPlacement: "drawer",
-  cardScaling: "auto",
   soundEffects: true,
+  useCardSlots: true,
+  autoOrganization: "both",
 };
 const SETTINGS_STORAGE_KEY = "zero-rush.gameSettings";
 
@@ -81,6 +83,8 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
   const {
     handCards,
     arrangementCards,
+    handSlots,
+    tableSlots,
     puzzleResult,
     foundDusk,
     foundDawn,
@@ -97,14 +101,21 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
     clearArrangement,
     canSubmit,
     setMaxHistoryLength,
+    cardCount,
+    setAutoOrgMode,
+    setUseCardSlots,
+    addToTableAtSlot,
+    removeFromTableAtSlot,
+    swapWithinTable,
+    swapWithinHand,
   } = useGame(difficulty);
 
   // Detect mobile viewport
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 640);
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   // Show victory modal when puzzle is completed
@@ -114,10 +125,18 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
     }
   }, [isComplete]);
 
-  // Sync maxHistoryLength setting with hook
+  // Sync settings with hook
   useEffect(() => {
     setMaxHistoryLength(settings.maxHistoryLength);
   }, [settings.maxHistoryLength, setMaxHistoryLength]);
+
+  useEffect(() => {
+    setAutoOrgMode(settings.autoOrganization);
+  }, [settings.autoOrganization, setAutoOrgMode]);
+
+  useEffect(() => {
+    setUseCardSlots(settings.useCardSlots);
+  }, [settings.useCardSlots, setUseCardSlots]);
 
   // Load settings from localStorage once on mount
   useEffect(() => {
@@ -126,7 +145,7 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
       if (!stored) return;
       const parsed = JSON.parse(stored) as Partial<GameSettings>;
       if (parsed && typeof parsed === "object") {
-        setSettings(prev => ({ ...prev, ...parsed }));
+        setSettings((prev) => ({ ...prev, ...parsed }));
       }
     } catch {
       // Ignore malformed storage
@@ -225,7 +244,7 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
   ]);
 
   const handleAddCard = useCallback(
-    (card: typeof handCards[number]) => {
+    (card: Card) => {
       play("cardAdd");
       addToArrangement(card);
     },
@@ -233,11 +252,48 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
   );
 
   const handleRemoveCard = useCallback(
-    (card: typeof arrangementCards[number]) => {
+    (card: Card) => {
       play("cardRemove");
       removeFromArrangement(card);
     },
     [removeFromArrangement, play]
+  );
+
+  // Slot-based handlers
+  const handleHandSlotClick = useCallback(
+    (index: number) => {
+      const card = handSlots[index];
+      if (card) {
+        play("cardAdd");
+        addToTableAtSlot(index);
+      }
+    },
+    [handSlots, addToTableAtSlot, play]
+  );
+
+  const handleTableSlotClick = useCallback(
+    (index: number) => {
+      const card = tableSlots[index];
+      if (card) {
+        play("cardRemove");
+        removeFromTableAtSlot(index);
+      }
+    },
+    [tableSlots, removeFromTableAtSlot, play]
+  );
+
+  const handleTableSwap = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      swapWithinTable(fromIndex, toIndex);
+    },
+    [swapWithinTable]
+  );
+
+  const handleHandSwap = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      swapWithinHand(fromIndex, toIndex);
+    },
+    [swapWithinHand]
   );
 
   const handleClear = useCallback(() => {
@@ -330,23 +386,8 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
     return "bg-muted text-foreground";
   };
 
-  // Determine card count for scaling
-  const cardCount = handCards.length + arrangementCards.length;
-
-  // Auto mode: scroll on mobile, scale on desktop for 8+ cards
-  let shouldScaleCards = false;
-  let shouldScrollCards = false;
-
-  if (cardCount >= 8) {
-    if (settings.cardScaling === "auto") {
-      shouldScrollCards = isMobile;
-      shouldScaleCards = !isMobile;
-    } else if (settings.cardScaling === "scale") {
-      shouldScaleCards = true;
-    } else if (settings.cardScaling === "scroll") {
-      shouldScrollCards = true;
-    }
-  }
+  // Scale cards for 8+ cards on desktop
+  const shouldScaleCards = cardCount >= 8 && !isMobile;
 
   return (
     <>
@@ -358,6 +399,9 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
         duskValue={puzzleResult.dusk.result}
         dawnValue={puzzleResult.dawn.result}
         onNewPuzzle={handleNewPuzzle}
+        duskSubmission={submissions.find((s) => s.isDusk)}
+        dawnSubmission={submissions.find((s) => s.isDawn)}
+        difficulty={difficulty}
       />
 
       {/* History Drawer (when in drawer mode) */}
@@ -372,7 +416,7 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
         />
       )}
 
-      <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-4 min-h-dvh">
+      <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-4 min-h-svh border border-dashed border-red-500">
         {/* Header with back button and settings */}
         <div className="flex items-center justify-between w-full mb-4">
           <button
@@ -482,45 +526,76 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
             Arrangement (drag to reorder, tap to remove):
           </div>
 
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={arrangementCardIds}
-              strategy={horizontalListSortingStrategy}
+          {settings.useCardSlots ? (
+            /* Slot-based rendering */
+            <div
+              className={cn(
+                "p-3 sm:p-4 rounded-2xl bg-muted/30 border w-full",
+                shouldScaleCards
+                  ? "min-h-[80px]"
+                  : "min-h-[100px] sm:min-h-[120px]"
+              )}
             >
-              <div
-                className={cn(
-                  "flex gap-2 sm:gap-3 p-3 sm:p-4 rounded-2xl bg-muted/30 border w-full",
-                  shouldScrollCards
-                    ? "overflow-x-auto scrollbar-thin justify-start"
-                    : "flex-wrap justify-center",
-                  shouldScaleCards ? "min-h-[80px]" : "min-h-[100px] sm:min-h-[120px]"
-                )}
-              >
-                {arrangementCards.length === 0 ? (
-                  <span className="text-sm text-muted-foreground self-center">
+              {tableSlots.length === 0 ? (
+                <div className="flex items-center justify-center h-full min-h-[60px]">
+                  <span className="text-sm text-muted-foreground">
                     Tap cards below to add them here
                   </span>
-                ) : (
-                  arrangementCards.map((card, index) => (
-                    <GameCard
-                      key={arrangementCardIds[index]}
-                      id={arrangementCardIds[index]}
-                      card={card}
-                      isFirst={index === 0}
-                      disabled={isComplete}
-                      draggable={true}
-                      onClick={() => handleRemoveCard(card)}
-                      size={shouldScaleCards ? "small" : "normal"}
-                    />
-                  ))
-                )}
-              </div>
-            </SortableContext>
-          </DndContext>
+                </div>
+              ) : (
+                <SlotGrid
+                  slots={tableSlots}
+                  totalSlots={tableSlots.length}
+                  zone="table"
+                  onSlotClick={handleTableSlotClick}
+                  onDragEnd={!isComplete ? handleTableSwap : undefined}
+                  disabled={isComplete}
+                  isTableZone={true}
+                  size={shouldScaleCards ? "small" : "normal"}
+                />
+              )}
+            </div>
+          ) : (
+            /* Legacy flex-based rendering */
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={arrangementCardIds}
+                strategy={horizontalListSortingStrategy}
+              >
+                <div
+                  className={cn(
+                    "flex gap-2 sm:gap-3 p-3 sm:p-4 rounded-2xl bg-muted/30 border w-full flex-wrap justify-center",
+                    shouldScaleCards
+                      ? "min-h-[80px]"
+                      : "min-h-[100px] sm:min-h-[120px]"
+                  )}
+                >
+                  {arrangementCards.length === 0 ? (
+                    <span className="text-sm text-muted-foreground self-center">
+                      Tap cards below to add them here
+                    </span>
+                  ) : (
+                    arrangementCards.map((card, index) => (
+                      <GameCard
+                        key={arrangementCardIds[index]}
+                        id={arrangementCardIds[index]}
+                        card={card}
+                        isFirst={index === 0}
+                        disabled={isComplete}
+                        draggable={true}
+                        onClick={() => handleRemoveCard(card)}
+                        size={shouldScaleCards ? "small" : "normal"}
+                      />
+                    ))
+                  )}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
 
           {/* Equation display with auto-calculated result */}
           <div className="flex items-center gap-2 text-base sm:text-lg min-h-[28px]">
@@ -550,7 +625,6 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
         <div
           className={cn(
             "w-full",
-            shouldScrollCards ? "overflow-x-auto" : "",
             shouldScaleCards ? "min-h-[70px]" : "min-h-[100px]"
           )}
         >
@@ -559,7 +633,11 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
             onCardTap={handleAddCard}
             disabled={isComplete}
             size={shouldScaleCards ? "small" : "normal"}
-            scrollable={shouldScrollCards}
+            slots={settings.useCardSlots ? handSlots : undefined}
+            totalSlots={settings.useCardSlots ? cardCount : undefined}
+            useSlots={settings.useCardSlots}
+            onSlotClick={handleHandSlotClick}
+            onSwapSlots={handleHandSwap}
           />
         </div>
       </div>

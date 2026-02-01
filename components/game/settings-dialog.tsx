@@ -138,18 +138,29 @@ export function SettingsDialog({ settings, onSettingsChange }: SettingsDialogPro
                 }
               />
 
-              {/* Card scaling */}
+              {/* Card slots toggle */}
+              <SettingToggle
+                label="Use Card Slots"
+                description="Show fixed positions for cards in both zones"
+                checked={settings.useCardSlots}
+                onChange={(checked) =>
+                  onSettingsChange({ ...settings, useCardSlots: checked })
+                }
+              />
+
+              {/* Auto-organization */}
               <SettingOptionGroup
-                label="Many Cards (8+)"
-                description="How to handle many cards in hand"
-                value={settings.cardScaling}
+                label="Auto-Organization"
+                description="Collapse gaps when cards are removed"
+                value={settings.autoOrganization}
                 options={[
-                  { value: "auto", label: "Auto" },
-                  { value: "scale", label: "Scale" },
-                  { value: "scroll", label: "Scroll" },
+                  { value: "off", label: "Off" },
+                  { value: "hand", label: "Hand" },
+                  { value: "table", label: "Table" },
+                  { value: "both", label: "Both" },
                 ]}
                 onChange={(value) =>
-                  onSettingsChange({ ...settings, cardScaling: value as "auto" | "scale" | "scroll" })
+                  onSettingsChange({ ...settings, autoOrganization: value as "off" | "hand" | "table" | "both" })
                 }
               />
 

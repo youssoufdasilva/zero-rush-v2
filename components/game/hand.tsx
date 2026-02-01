@@ -1,8 +1,9 @@
 "use client";
 
-import type { Card } from "@/lib/types/game";
+import type { Card, Slot } from "@/lib/types/game";
 import { OPERATOR_DISPLAY } from "@/lib/game/constants";
 import { cn } from "@/lib/utils";
+import { SlotGrid } from "./slot-grid";
 
 export interface HandProps {
   /** Cards available in hand */
@@ -15,6 +16,16 @@ export interface HandProps {
   size?: "normal" | "small";
   /** Whether to enable horizontal scrolling instead of wrapping */
   scrollable?: boolean;
+  /** Slot-based rendering */
+  slots?: Slot[];
+  /** Total number of slots for slot-based rendering */
+  totalSlots?: number;
+  /** Whether to use slot-based rendering */
+  useSlots?: boolean;
+  /** Callback when a slot is clicked (for slot-based rendering) */
+  onSlotClick?: (index: number) => void;
+  /** Callback for swapping slots (drag and drop) */
+  onSwapSlots?: (fromIndex: number, toIndex: number) => void;
 }
 
 export function Hand({
@@ -23,9 +34,44 @@ export function Hand({
   disabled = false,
   size = "normal",
   scrollable = false,
+  slots,
+  totalSlots,
+  useSlots = false,
+  onSlotClick,
+  onSwapSlots,
 }: HandProps) {
   const isSmall = size === "small";
 
+  // Slot-based rendering mode
+  if (useSlots && slots && totalSlots !== undefined && onSlotClick) {
+    const hasCards = slots.some((s) => s !== null);
+
+    return (
+      <div className="flex flex-col items-center gap-2 w-full">
+        <div className="text-sm font-medium text-muted-foreground">
+          {hasCards ? "Tap a card to add it:" : "All cards placed"}
+        </div>
+        <div
+          className={cn(
+            "p-4 rounded-2xl bg-muted/20 border border-border/50 w-full",
+            isSmall ? "min-h-[70px]" : "min-h-[100px]"
+          )}
+        >
+          <SlotGrid
+            slots={slots}
+            totalSlots={totalSlots}
+            zone="hand"
+            onSlotClick={onSlotClick}
+            onDragEnd={onSwapSlots}
+            disabled={disabled}
+            size={size}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Legacy flex-based rendering
   if (cards.length === 0) {
     return (
       <div

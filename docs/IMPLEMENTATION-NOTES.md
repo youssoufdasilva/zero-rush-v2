@@ -1,11 +1,83 @@
 # Implementation Notes
 
-> Technical details and implementation ideas captured during design discussions.  
+> Technical details and implementation ideas captured during design discussions.
 > For developer/AI agent reference during coding phase.
 
 ---
 
-## Backend & Database
+## Current Implementation
+
+### Game State Management (`use-game` hook)
+
+The `useGame` hook in `lib/hooks/use-game.ts` manages all game state:
+
+```typescript
+interface GameState {
+  handCards: Card[];           // Cards not yet placed
+  arrangementCards: Card[];    // Cards in play area
+  difficulty: Difficulty;
+  puzzleResult: PuzzleResult;  // Pre-calculated dusk/dawn
+  foundDusk: boolean;
+  foundDawn: boolean;
+  attempts: number;
+  currentResult: number | null; // Valid positive integer only
+  rawResult: number | null;     // Including negatives/decimals
+  isComplete: boolean;
+  submissions: Submission[];
+}
+```
+
+**Key features:**
+- Auto-calculates result as cards are arranged
+- Validates results (positive integers only)
+- Tracks submission history with duplicate detection
+- Signature-based duplicate checking (arrangement → string)
+
+### Sound Effects (`use-sound-effects` hook)
+
+Web Audio API implementation in `lib/hooks/use-sound-effects.ts`:
+
+- **Client-only**: SSR-safe with lazy AudioContext creation
+- **10 sound types**: cardAdd, cardRemove, submitValid, submitInvalid, duplicate, duskFound, dawnFound, puzzleComplete, clear, newPuzzle
+- **Multi-step tones**: Some sounds play note sequences (duskFound, dawnFound, puzzleComplete)
+- **Configurable**: Disabled via settings toggle
+
+### Settings Persistence
+
+Settings are stored in localStorage under `zero-rush-settings`:
+
+```typescript
+interface GameSettings {
+  showTargetValues: boolean;    // Default: false
+  highlightMatches: boolean;    // Default: true
+  autoSubmit: boolean;          // Default: false
+  soundEffects: boolean;        // Default: true
+  clearAfterSubmit: boolean;    // Default: false
+  controlsStyle: "text-icons" | "icons-only";  // Default: "text-icons"
+  historyPlacement: "inline" | "drawer";       // Default: "inline"
+  cardScaling: "auto" | "scale" | "scroll";    // Default: "auto"
+  maxHistoryLength: number;     // Default: 10
+}
+```
+
+### Mobile Drag-and-Drop
+
+Uses `@dnd-kit` with:
+- `TouchSensor` with 150ms activation delay (prevents accidental drags)
+- `PointerSensor` for desktop
+- Sortable lists for reordering
+- Drop zones in arrangement area
+
+### Card Scaling (8+ cards)
+
+When hand has 8+ cards, the `cardScaling` setting controls layout:
+- **auto**: Scroll on mobile (touch), scale on desktop
+- **scale**: Always reduce card size to fit
+- **scroll**: Always allow horizontal scrolling
+
+---
+
+## Future Implementation
 
 ### Convex Integration
 - Use **Convex realtime database** for multiplayer functionality
@@ -41,7 +113,7 @@ bunx convex dev          # Convex backend locally
 
 ---
 
-## PWA & Offline
+## PWA & Offline (Future)
 
 ### What Syncs on Reconnect
 - ✅ Completed games (with timestamps, attempts)
@@ -135,7 +207,7 @@ https://ui.shadcn.com/create?iconLibrary=hugeicons&base=base&style=nova&baseColo
 
 ---
 
-## In-Game Currency (💎 Gems)
+## In-Game Currency (Future)
 
 ### Earning Gems
 - Every 10 streaks = 💎 reward (amount TBD)
@@ -183,7 +255,7 @@ Always show saves used to preserve achievement integrity:
 
 ---
 
-## Puzzle Generation
+## Puzzle Generation (Implemented + Future)
 
 ### Daily Puzzles (Pre-Generated)
 Daily puzzles are **pre-generated and curated**, NOT dynamically generated from seed.
@@ -281,7 +353,7 @@ function toCanonicalSignature(cards: Card[]): string {
 
 ---
 
-## A/B Testing Infrastructure
+## A/B Testing Infrastructure (Future)
 
 ### Experiment Schema
 ```typescript
@@ -329,7 +401,7 @@ interface ExperimentMetric {
 
 ---
 
-## Multiplayer Architecture
+## Multiplayer Architecture (Future)
 
 ### Room State Machine
 ```

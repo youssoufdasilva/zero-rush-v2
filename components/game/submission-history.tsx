@@ -123,7 +123,7 @@ function SubmissionEntry({ submission, duskValue, dawnValue }: SubmissionEntryPr
   );
 }
 
-function MiniCard({ card, isFirst }: { card: Card; isFirst: boolean }) {
+export function MiniCard({ card, isFirst }: { card: Card; isFirst: boolean }) {
   const operatorSymbol = OPERATOR_DISPLAY[card.operator];
   
   return (

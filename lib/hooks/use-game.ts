@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import type { Card, Difficulty, PuzzleResult } from "@/lib/types/game";
+import type { Card, Difficulty, PuzzleResult, Slot, AutoOrgMode } from "@/lib/types/game";
 import { findGoodPuzzleForDifficulty } from "@/lib/game/generate";
 import { evaluate, isValidAnswer, cardToString } from "@/lib/game/evaluate";
 import { DIFFICULTY_CONFIG } from "@/lib/game/constants";
@@ -36,6 +36,10 @@ export interface GameState {
   handCards: Card[];
   /** Cards placed in arrangement area */
   arrangementCards: Card[];
+  /** Slot-based hand state (may contain nulls when auto-org is off) */
+  handSlots: Slot[];
+  /** Slot-based table state (may contain nulls when auto-org is off) */
+  tableSlots: Slot[];
   /** Current difficulty level */
   difficulty: Difficulty;
   /** Pre-calculated puzzle result with dusk/dawn values */
@@ -79,6 +83,22 @@ export interface UseGameReturn extends GameState {
   maxHistoryLength: number;
   /** Set max history length */
   setMaxHistoryLength: (length: number) => void;
+  /** Auto-organization mode */
+  autoOrgMode: AutoOrgMode;
+  /** Set auto-organization mode */
+  setAutoOrgMode: (mode: AutoOrgMode) => void;
+  /** Whether card slots are enabled */
+  useCardSlots: boolean;
+  /** Set whether card slots are enabled */
+  setUseCardSlots: (enabled: boolean) => void;
+  /** Move a card from hand slot to table slot */
+  addToTableAtSlot: (handIndex: number, tableIndex?: number) => void;
+  /** Remove a card from table slot back to hand */
+  removeFromTableAtSlot: (tableIndex: number) => void;
+  /** Swap two slots within the table */
+  swapWithinTable: (fromIndex: number, toIndex: number) => void;
+  /** Swap two slots within the hand */
+  swapWithinHand: (fromIndex: number, toIndex: number) => void;
 }
 
 function createInitialPuzzle(difficulty: Difficulty): {
@@ -89,35 +109,47 @@ function createInitialPuzzle(difficulty: Difficulty): {
   return { cards: puzzle, puzzleResult: result };
 }
 
-/** Generate a unique ID for a card based on its properties and index */
-function getCardId(card: Card, index: number): string {
-  return `${cardToString(card)}-${index}`;
-}
-
 export function useGame(initialDifficulty: Difficulty = "medium"): UseGameReturn {
   const [difficulty] = useState<Difficulty>(initialDifficulty);
   const [maxHistoryLength, setMaxHistoryLength] = useState(10);
-  
+  const [autoOrgMode, setAutoOrgMode] = useState<AutoOrgMode>("both");
+  const [useCardSlots, setUseCardSlots] = useState(true);
+
   // Initialize puzzle
-  const [puzzleData, setPuzzleData] = useState(() => 
+  const [puzzleData, setPuzzleData] = useState(() =>
     createInitialPuzzle(initialDifficulty)
   );
-  
-  // Split cards into hand and arrangement
-  const [handCards, setHandCards] = useState<Card[]>(puzzleData.cards);
-  const [arrangementCards, setArrangementCards] = useState<Card[]>([]);
+
+  // Slot-based state (may contain nulls when auto-org is off)
+  const [handSlots, setHandSlots] = useState<Slot[]>(puzzleData.cards);
+  const [tableSlots, setTableSlots] = useState<Slot[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  
+
   const [foundDusk, setFoundDusk] = useState(false);
   const [foundDawn, setFoundDawn] = useState(false);
   const [attempts, setAttempts] = useState(0);
 
   const isComplete = foundDusk && foundDawn;
-  
-  const cardCount = useMemo(() => 
-    DIFFICULTY_CONFIG[difficulty].cards, 
+
+  const cardCount = useMemo(() =>
+    DIFFICULTY_CONFIG[difficulty].cards,
     [difficulty]
   );
+
+  // Derived state: filtered cards for backward compatibility
+  const handCards = useMemo(() =>
+    handSlots.filter((slot): slot is Card => slot != null),
+    [handSlots]
+  );
+
+  const arrangementCards = useMemo(() =>
+    tableSlots.filter((slot): slot is Card => slot != null),
+    [tableSlots]
+  );
+
+  // Check if auto-org is enabled for each zone
+  const handAutoOrg = autoOrgMode === "hand" || autoOrgMode === "both";
+  const tableAutoOrg = autoOrgMode === "table" || autoOrgMode === "both";
 
   // Auto-calculate raw result (including negatives/decimals)
   const rawResult = useMemo(() => {
@@ -141,8 +173,8 @@ export function useGame(initialDifficulty: Difficulty = "medium"): UseGameReturn
   const generateNewPuzzle = useCallback(() => {
     const newPuzzleData = createInitialPuzzle(difficulty);
     setPuzzleData(newPuzzleData);
-    setHandCards(newPuzzleData.cards);
-    setArrangementCards([]);
+    setHandSlots(newPuzzleData.cards);
+    setTableSlots([]);
     setSubmissions([]);
     setFoundDusk(false);
     setFoundDawn(false);
@@ -150,35 +182,170 @@ export function useGame(initialDifficulty: Difficulty = "medium"): UseGameReturn
   }, [difficulty]);
 
   const addToArrangement = useCallback((card: Card) => {
-    setHandCards(prev => {
+    setHandSlots((prev) => {
       const index = prev.findIndex(
-        c => c.operator === card.operator && c.value === card.value
+        (c) => c !== null && c.operator === card.operator && c.value === card.value
       );
       if (index === -1) return prev;
-      return [...prev.slice(0, index), ...prev.slice(index + 1)];
+      if (handAutoOrg) {
+        // Auto-organize: remove the slot entirely
+        return [...prev.slice(0, index), ...prev.slice(index + 1)];
+      } else {
+        // Leave null gap
+        const newSlots = [...prev];
+        newSlots[index] = null;
+        return newSlots;
+      }
     });
-    setArrangementCards(prev => [...prev, card]);
-  }, []);
+    setTableSlots((prev) => [...prev, card]);
+  }, [handAutoOrg]);
 
   const removeFromArrangement = useCallback((card: Card) => {
-    setArrangementCards(prev => {
+    setTableSlots((prev) => {
       const index = prev.findIndex(
-        c => c.operator === card.operator && c.value === card.value
+        (c) => c !== null && c.operator === card.operator && c.value === card.value
       );
       if (index === -1) return prev;
-      return [...prev.slice(0, index), ...prev.slice(index + 1)];
+      if (tableAutoOrg) {
+        // Auto-organize: remove the slot entirely
+        return [...prev.slice(0, index), ...prev.slice(index + 1)];
+      } else {
+        // Leave null gap
+        const newSlots = [...prev];
+        newSlots[index] = null;
+        return newSlots;
+      }
     });
-    setHandCards(prev => [...prev, card]);
-  }, []);
+    // Add card back to hand - find first empty slot or append
+    setHandSlots((prev) => {
+      if (handAutoOrg) {
+        return [...prev, card];
+      }
+      const emptyIndex = prev.findIndex((s) => s === null);
+      if (emptyIndex !== -1) {
+        const newSlots = [...prev];
+        newSlots[emptyIndex] = card;
+        return newSlots;
+      }
+      return [...prev, card];
+    });
+  }, [tableAutoOrg, handAutoOrg]);
 
   const reorderArrangement = useCallback((newOrder: Card[]) => {
-    setArrangementCards(newOrder);
+    setTableSlots(newOrder);
   }, []);
 
   const clearArrangement = useCallback(() => {
-    setHandCards(prev => [...prev, ...arrangementCards]);
-    setArrangementCards([]);
-  }, [arrangementCards]);
+    // Return all cards from table to hand
+    const cardsToReturn = tableSlots.filter((s): s is Card => s !== null);
+    setHandSlots((prev) => {
+      if (handAutoOrg) {
+        return [...prev.filter((s): s is Card => s !== null), ...cardsToReturn];
+      }
+      // Fill in empty slots first, then append
+      const newSlots = [...prev];
+      let returnIndex = 0;
+      for (let i = 0; i < newSlots.length && returnIndex < cardsToReturn.length; i++) {
+        if (newSlots[i] === null) {
+          newSlots[i] = cardsToReturn[returnIndex++];
+        }
+      }
+      // Append remaining cards
+      while (returnIndex < cardsToReturn.length) {
+        newSlots.push(cardsToReturn[returnIndex++]);
+      }
+      return newSlots;
+    });
+    setTableSlots([]);
+  }, [tableSlots, handAutoOrg]);
+
+  // Slot-based operations
+  const addToTableAtSlot = useCallback((handIndex: number, tableIndex?: number) => {
+    const card = handSlots[handIndex];
+    if (!card) return; // Handle both null and undefined (out of bounds)
+
+    // Remove from hand
+    setHandSlots((prev) => {
+      if (handAutoOrg) {
+        return [...prev.slice(0, handIndex), ...prev.slice(handIndex + 1)];
+      }
+      const newSlots = [...prev];
+      newSlots[handIndex] = null;
+      return newSlots;
+    });
+
+    // Add to table
+    setTableSlots((prev) => {
+      if (tableIndex !== undefined && tableIndex >= 0) {
+        // Insert at specific index
+        if (tableIndex < prev.length && prev[tableIndex] === null) {
+          // Fill empty slot
+          const newSlots = [...prev];
+          newSlots[tableIndex] = card;
+          return newSlots;
+        }
+        // Insert at position
+        return [...prev.slice(0, tableIndex), card, ...prev.slice(tableIndex)];
+      }
+      // Find first empty slot or append
+      const emptyIndex = prev.findIndex((s) => s === null);
+      if (emptyIndex !== -1) {
+        const newSlots = [...prev];
+        newSlots[emptyIndex] = card;
+        return newSlots;
+      }
+      return [...prev, card];
+    });
+  }, [handSlots, handAutoOrg]);
+
+  const removeFromTableAtSlot = useCallback((tableIndex: number) => {
+    const card = tableSlots[tableIndex];
+    if (!card) return; // Handle both null and undefined (out of bounds)
+
+    // Remove from table
+    setTableSlots((prev) => {
+      if (tableAutoOrg) {
+        return [...prev.slice(0, tableIndex), ...prev.slice(tableIndex + 1)];
+      }
+      const newSlots = [...prev];
+      newSlots[tableIndex] = null;
+      return newSlots;
+    });
+
+    // Add back to hand
+    setHandSlots((prev) => {
+      if (handAutoOrg) {
+        return [...prev, card];
+      }
+      const emptyIndex = prev.findIndex((s) => s === null);
+      if (emptyIndex !== -1) {
+        const newSlots = [...prev];
+        newSlots[emptyIndex] = card;
+        return newSlots;
+      }
+      return [...prev, card];
+    });
+  }, [tableSlots, tableAutoOrg, handAutoOrg]);
+
+  const swapWithinTable = useCallback((fromIndex: number, toIndex: number) => {
+    setTableSlots((prev) => {
+      const newSlots = [...prev];
+      const temp = newSlots[fromIndex];
+      newSlots[fromIndex] = newSlots[toIndex];
+      newSlots[toIndex] = temp;
+      return newSlots;
+    });
+  }, []);
+
+  const swapWithinHand = useCallback((fromIndex: number, toIndex: number) => {
+    setHandSlots((prev) => {
+      const newSlots = [...prev];
+      const temp = newSlots[fromIndex];
+      newSlots[fromIndex] = newSlots[toIndex];
+      newSlots[toIndex] = temp;
+      return newSlots;
+    });
+  }, []);
 
   const submitAttempt = useCallback(() => {
     if (handCards.length > 0) {
@@ -234,8 +401,8 @@ export function useGame(initialDifficulty: Difficulty = "medium"): UseGameReturn
   }, [arrangementCards, handCards.length, puzzleData.puzzleResult, foundDusk, foundDawn, maxHistoryLength, submissions]);
 
   const resetGame = useCallback(() => {
-    setHandCards(puzzleData.cards);
-    setArrangementCards([]);
+    setHandSlots(puzzleData.cards);
+    setTableSlots([]);
     setSubmissions([]);
     setFoundDusk(false);
     setFoundDawn(false);
@@ -245,6 +412,8 @@ export function useGame(initialDifficulty: Difficulty = "medium"): UseGameReturn
   return {
     handCards,
     arrangementCards,
+    handSlots,
+    tableSlots,
     difficulty,
     puzzleResult: puzzleData.puzzleResult,
     foundDusk,
@@ -265,5 +434,13 @@ export function useGame(initialDifficulty: Difficulty = "medium"): UseGameReturn
     canSubmit,
     maxHistoryLength,
     setMaxHistoryLength,
+    autoOrgMode,
+    setAutoOrgMode,
+    useCardSlots,
+    setUseCardSlots,
+    addToTableAtSlot,
+    removeFromTableAtSlot,
+    swapWithinTable,
+    swapWithinHand,
   };
 }
