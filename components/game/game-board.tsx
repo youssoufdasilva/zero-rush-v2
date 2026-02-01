@@ -486,22 +486,6 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
           attempts={attempts}
         />
 
-        {/* Game controls */}
-        <div className="w-full flex justify-center mb-4">
-          <GameControlsCompact
-            onSubmit={handleSubmit}
-            onClear={handleClear}
-            onNewPuzzle={handleNewPuzzle}
-            attempts={attempts}
-            isComplete={isComplete}
-            canSubmit={canSubmit}
-            hasArrangement={arrangementCards.length > 0}
-            controlsStyle={settings.controlsStyle}
-            shakeSubmit={shakeSubmit}
-            ref={submitButtonRef}
-          />
-        </div>
-
         {/* Inline History - fixed height zone */}
         {settings.historyPlacement === "inline" && (
           <div
@@ -618,6 +602,22 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
           </div>
         </div>
 
+        {/* Game controls */}
+        <div className="w-full flex justify-center mb-4">
+          <GameControlsCompact
+            onSubmit={handleSubmit}
+            onClear={handleClear}
+            onNewPuzzle={handleNewPuzzle}
+            attempts={attempts}
+            isComplete={isComplete}
+            canSubmit={canSubmit}
+            hasArrangement={arrangementCards.length > 0}
+            controlsStyle={settings.controlsStyle}
+            shakeSubmit={shakeSubmit}
+            ref={submitButtonRef}
+          />
+        </div>
+
         {/* Spacer to push hand to bottom */}
         <div className="flex-1 min-h-1" />
 
@@ -690,6 +690,20 @@ const GameControlsCompact = ({
       </button>
 
       <button
+        onClick={onNewPuzzle}
+        className={cn(
+          "flex items-center justify-center gap-1.5",
+          "h-10 px-3 rounded-lg border border-input bg-background",
+          "hover:bg-accent hover:text-accent-foreground",
+          "transition-colors"
+        )}
+        title="New Puzzle"
+      >
+        <NewPuzzleIcon className="w-4 h-4" />
+        {showText && <span className="text-sm">New</span>}
+      </button>
+
+      <button
         onClick={onSubmit}
         disabled={!canSubmit || isComplete}
         className={cn(
@@ -706,20 +720,6 @@ const GameControlsCompact = ({
       >
         <SubmitIcon className="w-4 h-4" />
         {showText && <span className="text-sm font-medium">Submit</span>}
-      </button>
-
-      <button
-        onClick={onNewPuzzle}
-        className={cn(
-          "flex items-center justify-center gap-1.5",
-          "h-10 px-3 rounded-lg border border-input bg-background",
-          "hover:bg-accent hover:text-accent-foreground",
-          "transition-colors"
-        )}
-        title="New Puzzle"
-      >
-        <NewPuzzleIcon className="w-4 h-4" />
-        {showText && <span className="text-sm">New</span>}
       </button>
 
       {/* Attempts counter */}

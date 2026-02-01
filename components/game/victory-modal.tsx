@@ -61,7 +61,9 @@ function generateShareText(
       )
       .join(" ");
 
-  return `Zero Rush 🌅
+  return `Zero Rush 🌅 ${
+    attempts === 2 ? "- Two for Two! 🎯" : "- Good Job! 🎉"
+  }
 
 🔵 Dusk: ${duskSubmission.result}
 ${formatEquation(duskSubmission)} = ${duskSubmission.result}
@@ -69,7 +71,7 @@ ${formatEquation(duskSubmission)} = ${duskSubmission.result}
 🟡 Dawn: ${dawnSubmission.result}
 ${formatEquation(dawnSubmission)} = ${dawnSubmission.result}
 
-Solved in ${attempts} ${attempts === 1 ? "attempt" : "attempts"}!`;
+Found both targets in ${attempts} ${attempts === 1 ? "attempt" : "attempts"}!`;
 }
 
 export interface VictoryModalProps {
@@ -142,7 +144,9 @@ export function VictoryModal({
   }, [shareText]);
 
   const handleTwitterShare = useCallback(() => {
-    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+      shareText
+    )}`;
     window.open(url, "_blank", "noopener,noreferrer");
   }, [shareText]);
 
@@ -259,7 +263,8 @@ export function VictoryModal({
                     className={cn(
                       "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium",
                       "border border-input bg-background hover:bg-accent transition-colors",
-                      copied && "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                      copied &&
+                        "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
                     )}
                   >
                     {copied ? (
