@@ -65,6 +65,16 @@ export function SettingsDialog({ settings, onSettingsChange }: SettingsDialogPro
                 }
               />
 
+              {/* Directional hints toggle */}
+              <SettingToggle
+                label="Directional Hints"
+                description="Show arrows indicating which way to aim"
+                checked={settings.showDirectionalHints}
+                onChange={(checked) =>
+                  onSettingsChange({ ...settings, showDirectionalHints: checked })
+                }
+              />
+
               {/* Highlight matches toggle */}
               <SettingToggle
                 label="Highlight Matches"

@@ -35,6 +35,7 @@ import { useSoundEffects } from "@/lib/hooks/use-sound-effects";
 
 export interface GameSettings {
   showTargetValues: boolean;
+  showDirectionalHints: boolean;
   autoSubmit: boolean;
   maxHistoryLength: number;
   highlightMatches: boolean;
@@ -50,6 +51,7 @@ export interface GameSettings {
 
 const DEFAULT_SETTINGS: GameSettings = {
   showTargetValues: false,
+  showDirectionalHints: true,
   autoSubmit: false,
   maxHistoryLength: 10,
   highlightMatches: false,
@@ -211,15 +213,25 @@ export function GameBoard({
   useEffect(() => {
     try {
       const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
-      if (!stored) return;
+      if (!stored) {
+        // First time - set default based on difficulty
+        if (difficulty === "challenger") {
+          setSettings((prev) => ({ ...prev, showDirectionalHints: false }));
+        }
+        return;
+      }
       const parsed = JSON.parse(stored) as Partial<GameSettings>;
       if (parsed && typeof parsed === "object") {
+        // If showDirectionalHints not explicitly set and Challenger, default to false
+        if (parsed.showDirectionalHints === undefined && difficulty === "challenger") {
+          parsed.showDirectionalHints = false;
+        }
         setSettings((prev) => ({ ...prev, ...parsed }));
       }
     } catch {
       // Ignore malformed storage
     }
-  }, []);
+  }, [difficulty]);
 
   // Persist settings to localStorage
   useEffect(() => {
@@ -238,6 +250,18 @@ export function GameBoard({
       ),
     [arrangementCards]
   );
+
+  // Compute best attempts for target progress display
+  const bestAttempts = useMemo(() => {
+    const validSubmissions = submissions.filter((s) => !s.isInvalid);
+    if (validSubmissions.length === 0) return { lowest: null, highest: null };
+
+    const values = validSubmissions.map((s) => s.result);
+    return {
+      lowest: Math.min(...values),
+      highest: Math.max(...values),
+    };
+  }, [submissions]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -540,12 +564,16 @@ export function GameBoard({
             value={puzzleResult.dusk.result}
             found={foundDusk}
             showValue={settings.showTargetValues}
+            bestAttempt={bestAttempts.lowest}
+            showHint={settings.showDirectionalHints}
           />
           <TargetDisplay
             type="dawn"
             value={puzzleResult.dawn.result}
             found={foundDawn}
             showValue={settings.showTargetValues}
+            bestAttempt={bestAttempts.highest}
+            showHint={settings.showDirectionalHints}
           />
         </div>
 
