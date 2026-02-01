@@ -522,24 +522,16 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
                   : "min-h-[100px] sm:min-h-[120px]"
               )}
             >
-              {tableSlots.length === 0 ? (
-                <div className="flex items-center justify-center h-full min-h-[60px]">
-                  <span className="text-sm text-muted-foreground">
-                    Tap cards below to add them here
-                  </span>
-                </div>
-              ) : (
                 <SlotGrid
-                  slots={tableSlots}
-                  totalSlots={tableSlots.length}
-                  zone="table"
-                  onSlotClick={handleTableSlotClick}
-                  onDragEnd={!isComplete ? handleTableSwap : undefined}
-                  disabled={isComplete}
-                  isTableZone={true}
-                  size={shouldScaleCards ? "small" : "normal"}
-                />
-              )}
+                slots={tableSlots}
+                totalSlots={cardCount}
+                zone="table"
+                onSlotClick={handleTableSlotClick}
+                onDragEnd={!isComplete ? handleTableSwap : undefined}
+                disabled={isComplete}
+                isTableZone={true}
+                size={shouldScaleCards ? "small" : "hand"}
+              />
             </div>
           ) : (
             /* Legacy flex-based rendering */
