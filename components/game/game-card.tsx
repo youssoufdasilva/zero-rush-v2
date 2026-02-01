@@ -16,7 +16,7 @@ export interface GameCardProps {
   /** Click handler for tap interaction */
   onClick?: () => void;
   /** Size variant */
-  size?: "normal" | "small";
+  size?: "normal" | "small" | "hand";
 }
 
 export function GameCard({
@@ -45,6 +45,7 @@ export function GameCard({
 
   const operatorSymbol = OPERATOR_DISPLAY[card.operator];
   const isSmall = size === "small";
+  const isHand = size === "hand";
 
   const handleClick = (e: React.MouseEvent) => {
     // Only trigger click if not dragging and onClick is provided
@@ -69,7 +70,9 @@ export function GameCard({
         "select-none",
         "transition-all duration-150",
         // Size variants - minimum 44px (w-11) for touch targets
-        isSmall ? "w-11 h-14 sm:w-14 sm:h-18" : "w-16 h-20 sm:w-20 sm:h-24",
+        isSmall && "w-11 h-14 sm:w-14 sm:h-18",
+        isHand && "w-12 h-15 sm:w-14 sm:h-18",
+        !isSmall && !isHand && "w-16 h-20 sm:w-20 sm:h-24",
         // Cursor based on interaction mode
         draggable && !disabled && "cursor-grab active:cursor-grabbing",
         onClick &&
@@ -91,7 +94,9 @@ export function GameCard({
       <div
         className={cn(
           "font-bold leading-none",
-          isSmall ? "text-xl sm:text-2xl" : "text-xl sm:text-2xl",
+          isSmall && "text-xl sm:text-2xl",
+          isHand && "text-lg sm:text-xl",
+          !isSmall && !isHand && "text-xl sm:text-2xl",
           // Muted on first card since operator is ignored in evaluation
           isFirst ? "text-muted-foreground/40" : "text-foreground",
           card.operator === "+" && "text-emerald-600 dark:text-emerald-400",
@@ -108,7 +113,9 @@ export function GameCard({
       <div
         className={cn(
           "font-bold tabular-nums",
-          isSmall ? "text-lg sm:text-xl" : "text-2xl sm:text-3xl"
+          isSmall && "text-lg sm:text-xl",
+          isHand && "text-base sm:text-lg",
+          !isSmall && !isHand && "text-2xl sm:text-3xl"
         )}
       >
         {card.value}

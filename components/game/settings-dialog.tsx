@@ -148,6 +148,16 @@ export function SettingsDialog({ settings, onSettingsChange }: SettingsDialogPro
                 }
               />
 
+              {/* Hand drag toggle */}
+              <SettingToggle
+                label="Hand Drag & Drop"
+                description="Allow reordering cards in hand by dragging"
+                checked={settings.enableHandDrag}
+                onChange={(checked) =>
+                  onSettingsChange({ ...settings, enableHandDrag: checked })
+                }
+              />
+
               {/* Auto-organization */}
               <SettingOptionGroup
                 label="Auto-Organization"

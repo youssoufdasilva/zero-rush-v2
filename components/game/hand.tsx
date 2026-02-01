@@ -13,7 +13,7 @@ export interface HandProps {
   /** Whether interactions are disabled */
   disabled?: boolean;
   /** Card size variant */
-  size?: "normal" | "small";
+  size?: "normal" | "small" | "hand";
   /** Whether to enable horizontal scrolling instead of wrapping */
   scrollable?: boolean;
   /** Slot-based rendering */
@@ -117,7 +117,7 @@ interface HandCardProps {
   card: Card;
   onTap: () => void;
   disabled?: boolean;
-  size?: "normal" | "small";
+  size?: "normal" | "small" | "hand";
 }
 
 function HandCard({
@@ -128,6 +128,7 @@ function HandCard({
 }: HandCardProps) {
   const operatorSymbol = OPERATOR_DISPLAY[card.operator];
   const isSmall = size === "small";
+  const isHand = size === "hand";
 
   return (
     <button
@@ -142,7 +143,9 @@ function HandCard({
         "active:scale-95",
         "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
         // Size variants - minimum 44px (w-11) for touch targets
-        isSmall ? "w-11 h-14 sm:w-12 sm:h-16" : "w-14 h-18 sm:w-16 sm:h-20",
+        isSmall && "w-11 h-14 sm:w-12 sm:h-16",
+        isHand && "w-12 h-15 sm:w-14 sm:h-18",
+        !isSmall && !isHand && "w-14 h-18 sm:w-16 sm:h-20",
         // Operator-based coloring
         card.operator === "+" && "border-emerald-500 dark:border-emerald-400",
         card.operator === "-" && "border-rose-500 dark:border-rose-400",
@@ -156,7 +159,9 @@ function HandCard({
       <div
         className={cn(
           "font-bold leading-none",
-          isSmall ? "text-lg sm:text-xl" : "text-lg sm:text-xl",
+          isSmall && "text-lg sm:text-xl",
+          isHand && "text-base sm:text-lg",
+          !isSmall && !isHand && "text-lg sm:text-xl",
           card.operator === "+" && "text-emerald-600 dark:text-emerald-400",
           card.operator === "-" && "text-rose-600 dark:text-rose-400",
           card.operator === "*" && "text-violet-600 dark:text-violet-400",
@@ -170,7 +175,9 @@ function HandCard({
       <div
         className={cn(
           "font-bold tabular-nums",
-          isSmall ? "text-base sm:text-lg" : "text-xl sm:text-2xl"
+          isSmall && "text-base sm:text-lg",
+          isHand && "text-sm sm:text-base",
+          !isSmall && !isHand && "text-xl sm:text-2xl"
         )}
       >
         {card.value}

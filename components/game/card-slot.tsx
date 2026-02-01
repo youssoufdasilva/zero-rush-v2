@@ -10,7 +10,7 @@ export interface CardSlotProps {
   /** Whether this slot is empty (no card) */
   isEmpty?: boolean;
   /** Size variant */
-  size?: "normal" | "small";
+  size?: "normal" | "small" | "hand";
   /** Click handler for empty slot */
   onClick?: () => void;
 }
@@ -27,6 +27,7 @@ export function CardSlot({
 
   const showHover = isOver || isOverProp;
   const isSmall = size === "small";
+  const isHand = size === "hand";
 
   return (
     <div
@@ -37,7 +38,9 @@ export function CardSlot({
         "rounded-xl border-2 border-dashed",
         "transition-all duration-200",
         // Size variants
-        isSmall ? "w-11 h-14 sm:w-14 sm:h-18" : "w-16 h-20 sm:w-20 sm:h-24",
+        isSmall && "w-11 h-14 sm:w-14 sm:h-18",
+        isHand && "w-12 h-15 sm:w-14 sm:h-18",
+        !isSmall && !isHand && "w-16 h-20 sm:w-20 sm:h-24",
         // Empty state styling
         isEmpty
           ? "bg-muted/20 border-muted-foreground/20 shadow-inner"

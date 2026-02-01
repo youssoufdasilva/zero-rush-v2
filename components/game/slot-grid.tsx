@@ -39,7 +39,7 @@ export interface SlotGridProps {
   /** Whether this is the first card (for operator display) */
   isTableZone?: boolean;
   /** Size variant */
-  size?: "normal" | "small";
+  size?: "normal" | "small" | "hand";
 }
 
 export function SlotGrid({

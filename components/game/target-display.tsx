@@ -19,7 +19,7 @@ export function TargetDisplay({ type, value, found, showValue = false }: TargetD
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-2 p-4 rounded-xl min-w-[120px]",
+        "flex flex-col items-center gap-1 p-3 rounded-xl min-w-[100px]",
         "border-2 transition-all duration-300",
         // Dusk styling (blue/sky)
         isDusk && !found && "border-sky-500/30 bg-sky-500/5",
@@ -32,12 +32,12 @@ export function TargetDisplay({ type, value, found, showValue = false }: TargetD
       {/* Label */}
       <div
         className={cn(
-          "text-sm font-semibold uppercase tracking-wider",
+          "text-xs font-semibold uppercase tracking-wider",
           isDusk ? "text-sky-600 dark:text-sky-400" : "text-amber-600 dark:text-amber-400"
         )}
       >
         {isDusk ? "Dusk" : "Dawn"}
-        <span className="ml-1 text-xs font-normal opacity-70">
+        <span className="ml-1 text-[10px] font-normal opacity-70">
           ({isDusk ? "lowest" : "highest"})
         </span>
       </div>
@@ -45,7 +45,7 @@ export function TargetDisplay({ type, value, found, showValue = false }: TargetD
       {/* Target value - hidden until found or showValue is true */}
       <div
         className={cn(
-          "text-4xl sm:text-5xl font-bold tabular-nums transition-all",
+          "text-3xl sm:text-4xl font-bold tabular-nums transition-all",
           isDusk ? "text-sky-600 dark:text-sky-400" : "text-amber-600 dark:text-amber-400",
           found && "scale-110"
         )}

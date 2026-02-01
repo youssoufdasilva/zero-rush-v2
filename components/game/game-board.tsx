@@ -43,6 +43,7 @@ export interface GameSettings {
   soundEffects: boolean;
   useCardSlots: boolean;
   autoOrganization: AutoOrgMode;
+  enableHandDrag: boolean;
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -55,7 +56,8 @@ const DEFAULT_SETTINGS: GameSettings = {
   historyPlacement: "drawer",
   soundEffects: true,
   useCardSlots: true,
-  autoOrganization: "both",
+  autoOrganization: "hand",
+  enableHandDrag: false,
 };
 const SETTINGS_STORAGE_KEY = "zero-rush.gameSettings";
 
@@ -464,7 +466,7 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
         </div>
 
         {/* Target displays - fixed height zone */}
-        <div className="flex flex-wrap justify-center gap-4 sm:gap-8 w-full min-h-[140px]">
+        <div className="flex flex-wrap justify-center gap-4 sm:gap-8 w-full min-h-[110px]">
           <TargetDisplay
             type="dusk"
             value={puzzleResult.dusk.result}
@@ -632,12 +634,12 @@ export function GameBoard({ difficulty, onBack }: GameBoardProps) {
             cards={handCards}
             onCardTap={handleAddCard}
             disabled={isComplete}
-            size={shouldScaleCards ? "small" : "normal"}
+            size={shouldScaleCards ? "small" : "hand"}
             slots={settings.useCardSlots ? handSlots : undefined}
             totalSlots={settings.useCardSlots ? cardCount : undefined}
             useSlots={settings.useCardSlots}
             onSlotClick={handleHandSlotClick}
-            onSwapSlots={handleHandSwap}
+            onSwapSlots={settings.enableHandDrag ? handleHandSwap : undefined}
           />
         </div>
       </div>
