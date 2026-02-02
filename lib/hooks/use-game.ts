@@ -679,29 +679,51 @@ export function useGame(
           return tableState.slice(hintedCount);
         });
 
-        // Return hinted cards to hand
+        // Return hinted cards to hand (only those not already in hand)
         setHandSlots((handState) => {
+          const existingHandCards = handState.filter(
+            (s): s is Card => s !== null
+          );
+
+          // Filter out hints that are already in hand to avoid duplicates
+          const hintsToReturn: Card[] = [];
+          const usedHandCards = [...existingHandCards];
+
+          for (const hint of activeHints) {
+            const alreadyInHandIndex = usedHandCards.findIndex((c) =>
+              isSameCard(c, hint)
+            );
+            if (alreadyInHandIndex !== -1) {
+              // Card already in hand, mark it as used but don't add again
+              usedHandCards.splice(alreadyInHandIndex, 1);
+            } else {
+              // Card not in hand, need to return it
+              hintsToReturn.push(hint);
+            }
+          }
+
+          if (hintsToReturn.length === 0) {
+            return handState; // Nothing to add
+          }
+
           if (handAutoOrg) {
-            return [
-              ...handState.filter((s): s is Card => s !== null),
-              ...activeHints,
-            ];
+            return [...existingHandCards, ...hintsToReturn];
           }
           // Fill in empty slots first
           const newSlots = [...handState];
           let hintIndex = 0;
           for (
             let i = 0;
-            i < newSlots.length && hintIndex < activeHints.length;
+            i < newSlots.length && hintIndex < hintsToReturn.length;
             i++
           ) {
             if (newSlots[i] === null) {
-              newSlots[i] = activeHints[hintIndex++];
+              newSlots[i] = hintsToReturn[hintIndex++];
             }
           }
           // Append remaining hints
-          while (hintIndex < activeHints.length) {
-            newSlots.push(activeHints[hintIndex++]);
+          while (hintIndex < hintsToReturn.length) {
+            newSlots.push(hintsToReturn[hintIndex++]);
           }
           return newSlots;
         });
@@ -713,7 +735,7 @@ export function useGame(
         activeTarget: null,
       };
     });
-  }, [handAutoOrg]);
+  }, [handAutoOrg, isSameCard]);
 
   // Clear only non-hinted cards from table, keeping hinted cards in place
   const clearNonHintedCards = useCallback(() => {
