@@ -85,20 +85,6 @@ export function TargetDisplay({
         </div>
       )}
 
-      {/* Hint progress badge - top left */}
-      {showReveals && hintCount > 0 && !found && (
-        <div
-          className={cn(
-            "absolute top-2 left-2 text-[10px] px-1.5 py-0.5 rounded-full font-medium",
-            isDusk
-              ? "bg-sky-500/20 text-sky-600 dark:text-sky-400"
-              : "bg-amber-500/20 text-amber-600 dark:text-amber-400"
-          )}
-        >
-          {hintCount}/{maxHints}
-        </div>
-      )}
-
       {/* Label */}
       <div
         className={cn(

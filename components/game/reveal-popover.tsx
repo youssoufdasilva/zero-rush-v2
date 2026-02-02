@@ -17,8 +17,12 @@ export interface RevealPopoverProps {
   totalCards: number;
   /** Maximum hints allowed (based on settings) */
   maxHints: number;
-  /** Callback when user confirms reveal */
+  /** Callback when user confirms reveal of next card */
   onReveal: () => void;
+  /** Callback when user wants to resume/switch to this target without revealing more */
+  onResume: () => void;
+  /** Whether this target's hints are currently displayed on the table */
+  isActiveTarget: boolean;
 }
 
 export function RevealPopover({
@@ -29,6 +33,8 @@ export function RevealPopover({
   totalCards,
   maxHints,
   onReveal,
+  onResume,
+  isActiveTarget,
 }: RevealPopoverProps) {
   const [showLearnMore, setShowLearnMore] = useState(false);
 
@@ -38,6 +44,7 @@ export function RevealPopover({
   const isFirstReveal = revealedCount === 0;
   const isAtMax = revealedCount >= maxHints;
   const remainingHints = maxHints - revealedCount;
+  const hasProgressButNotActive = revealedCount > 0 && !isActiveTarget;
 
   const handleReveal = () => {
     onReveal();
@@ -114,8 +121,73 @@ export function RevealPopover({
                 </Button>
               </div>
             </div>
+          ) : hasProgressButNotActive ? (
+            // Has progress but not active - show Resume button to switch target
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Progress:</span>
+                <span
+                  className={cn(
+                    "font-medium",
+                    isDusk
+                      ? "text-sky-600 dark:text-sky-400"
+                      : "text-amber-600 dark:text-amber-400"
+                  )}
+                >
+                  {revealedCount} of {totalCards} cards
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full transition-all duration-300",
+                    isDusk ? "bg-sky-500" : "bg-amber-500"
+                  )}
+                  style={{ width: `${(revealedCount / totalCards) * 100}%` }}
+                />
+              </div>
+
+              <p className="text-sm text-muted-foreground text-center">
+                You have {revealedCount} hint{revealedCount !== 1 ? "s" : ""}{" "}
+                saved for {isDusk ? "dusk" : "dawn"}.
+              </p>
+
+              {/* Resume button - switches back without revealing more */}
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full",
+                  isDusk
+                    ? "border-sky-500 text-sky-600 dark:text-sky-400 hover:bg-sky-500/10"
+                    : "border-amber-500 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                )}
+                onClick={onResume}
+              >
+                Resume with Current Hints
+              </Button>
+
+              {/* Reveal more button - only if not at max */}
+              {!isAtMax && (
+                <Button
+                  className={cn(
+                    "w-full",
+                    isDusk
+                      ? "bg-sky-500 hover:bg-sky-600 text-white"
+                      : "bg-amber-500 hover:bg-amber-600 text-white"
+                  )}
+                  onClick={handleReveal}
+                >
+                  Reveal Next Card
+                  <span className="ml-2 text-xs opacity-80">
+                    ({remainingHints} remaining)
+                  </span>
+                </Button>
+              )}
+            </div>
           ) : (
-            // After first reveal - show progress and reveal more button
+            // Active and has progress - show reveal more button
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Progress:</span>

@@ -148,7 +148,9 @@ export function GameBoard({
     swapWithinTable,
     swapWithinHand,
     revealNextHint,
+    resumeHints,
     clearHints,
+    clearNonHintedCards,
     getHintedCards,
   } = useGame({ difficulty, providedCards });
 
@@ -197,6 +199,11 @@ export function GameBoard({
           : undefined,
         source: puzzleSource,
         sharedFromUrl,
+        hintsUsed: {
+          dusk: hints.dusk.length,
+          dawn: hints.dawn.length,
+          total: hints.dusk.length + hints.dawn.length,
+        },
       });
 
       addHistoryEntry(entry);
@@ -215,6 +222,7 @@ export function GameBoard({
     puzzleSource,
     sharedFromUrl,
     addHistoryEntry,
+    hints,
   ]);
 
   // Reset history saved flag when generating new puzzle
@@ -380,7 +388,12 @@ export function GameBoard({
 
     // Clear arrangement after successful submit if setting is enabled
     if (settings.clearAfterSubmit && !completesPuzzle) {
-      clearArrangement();
+      if (hasActiveHints) {
+        // Only remove non-hinted cards from table
+        clearNonHintedCards();
+      } else {
+        clearArrangement();
+      }
     }
   }, [
     submitAttempt,
@@ -388,6 +401,8 @@ export function GameBoard({
     foundDusk,
     foundDawn,
     clearArrangement,
+    clearNonHintedCards,
+    hasActiveHints,
     play,
   ]);
 
@@ -482,6 +497,12 @@ export function GameBoard({
     if (!revealPopoverTarget) return;
     revealNextHint(revealPopoverTarget);
   }, [revealPopoverTarget, revealNextHint]);
+
+  const handleResume = useCallback(() => {
+    if (!revealPopoverTarget) return;
+    resumeHints(revealPopoverTarget);
+    setRevealPopoverTarget(null);
+  }, [revealPopoverTarget, resumeHints]);
 
   // Handle attempted interaction with hinted card
   const handleHintedCardInteraction = useCallback(() => {
@@ -598,6 +619,8 @@ export function GameBoard({
           totalCards={cardCount}
           maxHints={maxHints}
           onReveal={handleReveal}
+          onResume={handleResume}
+          isActiveTarget={hints.activeTarget === revealPopoverTarget}
         />
       )}
 

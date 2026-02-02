@@ -121,8 +121,12 @@ export interface UseGameReturn extends GameState {
   swapWithinHand: (fromIndex: number, toIndex: number) => void;
   /** Reveal the next hint card for the specified target */
   revealNextHint: (target: "dusk" | "dawn") => void;
+  /** Resume showing hints for a target without revealing a new card */
+  resumeHints: (target: "dusk" | "dawn") => void;
   /** Clear all active hints and restore normal mode */
   clearHints: () => void;
+  /** Clear only non-hinted cards from the table, keeping hinted cards in place */
+  clearNonHintedCards: () => void;
   /** Get currently active hinted cards with their positions */
   getHintedCards: () => HintedCard[];
   /** Check if a card in the table is a hinted card (locked) */
@@ -433,6 +437,11 @@ export function useGame(
     });
   }, []);
 
+  // Helper to check if two cards are the same
+  const isSameCard = useCallback((a: Card, b: Card): boolean => {
+    return a.operator === b.operator && a.value === b.value;
+  }, []);
+
   // Reveal next hint card for the specified target
   const revealNextHint = useCallback(
     (target: "dusk" | "dawn") => {
@@ -452,73 +461,309 @@ export function useGame(
 
         const nextCard = solution[nextIndex];
 
-        // If switching targets, we need to update the table
-        if (prev.activeTarget !== target) {
-          // Clear the table and move cards to hand when switching targets
-          // This is handled in the game board component
-        }
+        // All hinted cards for this target (including the new one)
+        const allHintsForTarget = [...currentReveals, nextCard];
+
+        // Get all puzzle cards to identify non-hinted ones
+        const allPuzzleCards = puzzleData.cards;
+
+        // Clear table and return only NON-hinted cards to hand
+        setTableSlots((tableState) => {
+          const tableCards = tableState.filter((s): s is Card => s !== null);
+
+          // Identify which table cards are NOT in the hints
+          const nonHintedTableCards: Card[] = [];
+          const hintedCardsUsed = [...allHintsForTarget];
+
+          for (const tableCard of tableCards) {
+            const hintIndex = hintedCardsUsed.findIndex((h) =>
+              isSameCard(h, tableCard)
+            );
+            if (hintIndex !== -1) {
+              // This card matches a hint, remove from available hints
+              hintedCardsUsed.splice(hintIndex, 1);
+            } else {
+              // This card is not hinted, return to hand
+              nonHintedTableCards.push(tableCard);
+            }
+          }
+
+          // Return non-hinted cards to hand
+          if (nonHintedTableCards.length > 0) {
+            setHandSlots((handState) => {
+              if (handAutoOrg) {
+                return [
+                  ...handState.filter((s): s is Card => s !== null),
+                  ...nonHintedTableCards,
+                ];
+              }
+              // Fill in empty slots first
+              const newSlots = [...handState];
+              let returnIndex = 0;
+              for (
+                let i = 0;
+                i < newSlots.length && returnIndex < nonHintedTableCards.length;
+                i++
+              ) {
+                if (newSlots[i] === null) {
+                  newSlots[i] = nonHintedTableCards[returnIndex++];
+                }
+              }
+              while (returnIndex < nonHintedTableCards.length) {
+                newSlots.push(nonHintedTableCards[returnIndex++]);
+              }
+              return newSlots;
+            });
+          }
+
+          // Clear the table (will place hinted cards next)
+          return [];
+        });
+
+        // Remove hinted cards from hand and place on table
+        setHandSlots((handState) => {
+          let newHandSlots = [...handState];
+
+          for (const hintCard of allHintsForTarget) {
+            const handIndex = newHandSlots.findIndex(
+              (c) => c !== null && isSameCard(c, hintCard)
+            );
+            if (handIndex !== -1) {
+              if (handAutoOrg) {
+                newHandSlots = [
+                  ...newHandSlots.slice(0, handIndex),
+                  ...newHandSlots.slice(handIndex + 1),
+                ];
+              } else {
+                newHandSlots[handIndex] = null;
+              }
+            }
+          }
+          return newHandSlots;
+        });
+
+        // Place hinted cards on table in order
+        setTableSlots(() => {
+          return [...allHintsForTarget];
+        });
 
         return {
           ...prev,
-          [target]: [...currentReveals, nextCard],
+          [target]: allHintsForTarget,
           activeTarget: target,
         };
       });
+    },
+    [puzzleData.puzzleResult, puzzleData.cards, handAutoOrg, isSameCard]
+  );
 
-      // When switching targets or starting hints, clear table and place hinted cards
+  // Resume showing hints for a target without revealing a new card
+  const resumeHints = useCallback(
+    (target: "dusk" | "dawn") => {
       setHints((prev) => {
-        if (prev.activeTarget === target) {
-          return prev; // Already handled above
+        const existingHints = prev[target];
+
+        // If no hints for this target, do nothing
+        if (existingHints.length === 0) {
+          return prev;
         }
-        return prev;
+
+        // If already active for this target, do nothing
+        if (prev.activeTarget === target) {
+          return prev;
+        }
+
+        // Clear table and return only NON-hinted cards to hand
+        setTableSlots((tableState) => {
+          const tableCards = tableState.filter((s): s is Card => s !== null);
+
+          // Identify which table cards are NOT in the hints
+          const nonHintedTableCards: Card[] = [];
+          const hintedCardsUsed = [...existingHints];
+
+          for (const tableCard of tableCards) {
+            const hintIndex = hintedCardsUsed.findIndex((h) =>
+              isSameCard(h, tableCard)
+            );
+            if (hintIndex !== -1) {
+              // This card matches a hint, remove from available hints
+              hintedCardsUsed.splice(hintIndex, 1);
+            } else {
+              // This card is not hinted, return to hand
+              nonHintedTableCards.push(tableCard);
+            }
+          }
+
+          // Return non-hinted cards to hand
+          if (nonHintedTableCards.length > 0) {
+            setHandSlots((handState) => {
+              if (handAutoOrg) {
+                return [
+                  ...handState.filter((s): s is Card => s !== null),
+                  ...nonHintedTableCards,
+                ];
+              }
+              // Fill in empty slots first
+              const newSlots = [...handState];
+              let returnIndex = 0;
+              for (
+                let i = 0;
+                i < newSlots.length && returnIndex < nonHintedTableCards.length;
+                i++
+              ) {
+                if (newSlots[i] === null) {
+                  newSlots[i] = nonHintedTableCards[returnIndex++];
+                }
+              }
+              while (returnIndex < nonHintedTableCards.length) {
+                newSlots.push(nonHintedTableCards[returnIndex++]);
+              }
+              return newSlots;
+            });
+          }
+
+          // Clear the table (will place hinted cards next)
+          return [];
+        });
+
+        // Remove hinted cards from hand
+        setHandSlots((handState) => {
+          let newHandSlots = [...handState];
+
+          for (const hintCard of existingHints) {
+            const handIndex = newHandSlots.findIndex(
+              (c) => c !== null && isSameCard(c, hintCard)
+            );
+            if (handIndex !== -1) {
+              if (handAutoOrg) {
+                newHandSlots = [
+                  ...newHandSlots.slice(0, handIndex),
+                  ...newHandSlots.slice(handIndex + 1),
+                ];
+              } else {
+                newHandSlots[handIndex] = null;
+              }
+            }
+          }
+          return newHandSlots;
+        });
+
+        // Place hinted cards on table in order
+        setTableSlots(() => {
+          return [...existingHints];
+        });
+
+        return {
+          ...prev,
+          activeTarget: target,
+        };
       });
     },
-    [puzzleData.puzzleResult]
+    [handAutoOrg, isSameCard]
   );
 
   // Clear all active hints
   const clearHints = useCallback(() => {
-    // Return hinted cards from table to hand and clear hint state
-    const activeHints = hints.activeTarget ? hints[hints.activeTarget] : [];
+    setHints((prev) => {
+      if (!prev.activeTarget) {
+        return prev; // No active hints to clear
+      }
 
-    if (activeHints.length > 0) {
-      // Remove hinted cards from table and return to hand
-      setTableSlots((prev) => {
-        const hintedCount = activeHints.length;
-        // Remove the first N cards (which are the hinted ones)
-        return prev.slice(hintedCount);
-      });
+      const activeHints = prev[prev.activeTarget];
+      const hintedCount = activeHints.length;
 
-      setHandSlots((prev) => {
-        if (handAutoOrg) {
-          return [...prev.filter((s): s is Card => s !== null), ...activeHints];
-        }
-        // Fill in empty slots
-        const newSlots = [...prev];
-        let hintIndex = 0;
-        for (
-          let i = 0;
-          i < newSlots.length && hintIndex < activeHints.length;
-          i++
-        ) {
-          if (newSlots[i] === null) {
-            newSlots[i] = activeHints[hintIndex++];
+      if (hintedCount > 0) {
+        // Remove hinted cards from table (first N cards) and keep any user-placed cards
+        setTableSlots((tableState) => {
+          // User-placed cards are after the hinted ones
+          return tableState.slice(hintedCount);
+        });
+
+        // Return hinted cards to hand
+        setHandSlots((handState) => {
+          if (handAutoOrg) {
+            return [
+              ...handState.filter((s): s is Card => s !== null),
+              ...activeHints,
+            ];
           }
-        }
-        // Append remaining hints
-        while (hintIndex < activeHints.length) {
-          newSlots.push(activeHints[hintIndex++]);
-        }
-        return newSlots;
-      });
+          // Fill in empty slots first
+          const newSlots = [...handState];
+          let hintIndex = 0;
+          for (
+            let i = 0;
+            i < newSlots.length && hintIndex < activeHints.length;
+            i++
+          ) {
+            if (newSlots[i] === null) {
+              newSlots[i] = activeHints[hintIndex++];
+            }
+          }
+          // Append remaining hints
+          while (hintIndex < activeHints.length) {
+            newSlots.push(activeHints[hintIndex++]);
+          }
+          return newSlots;
+        });
+      }
+
+      return {
+        dusk: prev.dusk, // Preserve progress
+        dawn: prev.dawn, // Preserve progress
+        activeTarget: null,
+      };
+    });
+  }, [handAutoOrg]);
+
+  // Clear only non-hinted cards from table, keeping hinted cards in place
+  const clearNonHintedCards = useCallback(() => {
+    if (!hints.activeTarget) {
+      // No hints active, behave like normal clear
+      clearArrangement();
+      return;
     }
 
-    setHints({
-      dusk: hints.dusk, // Preserve progress
-      dawn: hints.dawn, // Preserve progress
-      activeTarget: null,
+    const activeHints = hints[hints.activeTarget];
+    const hintedCount = activeHints.length;
+
+    // Get non-hinted cards from table (everything after the hinted ones)
+    setTableSlots((tableState) => {
+      const nonHintedCards = tableState
+        .slice(hintedCount)
+        .filter((s): s is Card => s !== null);
+
+      // Return non-hinted cards to hand
+      if (nonHintedCards.length > 0) {
+        setHandSlots((handState) => {
+          if (handAutoOrg) {
+            return [
+              ...handState.filter((s): s is Card => s !== null),
+              ...nonHintedCards,
+            ];
+          }
+          // Fill in empty slots first
+          const newSlots = [...handState];
+          let returnIndex = 0;
+          for (
+            let i = 0;
+            i < newSlots.length && returnIndex < nonHintedCards.length;
+            i++
+          ) {
+            if (newSlots[i] === null) {
+              newSlots[i] = nonHintedCards[returnIndex++];
+            }
+          }
+          while (returnIndex < nonHintedCards.length) {
+            newSlots.push(nonHintedCards[returnIndex++]);
+          }
+          return newSlots;
+        });
+      }
+
+      // Keep only hinted cards on table
+      return tableState.slice(0, hintedCount);
     });
-  }, [hints, handAutoOrg]);
+  }, [hints, handAutoOrg, clearArrangement]);
 
   // Get currently active hinted cards with positions
   const getHintedCards = useCallback((): HintedCard[] => {
@@ -660,7 +905,9 @@ export function useGame(
     swapWithinTable,
     swapWithinHand,
     revealNextHint,
+    resumeHints,
     clearHints,
+    clearNonHintedCards,
     getHintedCards,
     isHintedCard,
   };

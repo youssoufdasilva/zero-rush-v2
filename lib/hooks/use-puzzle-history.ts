@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import type { Card, Difficulty, PuzzleHistoryEntry, HistorySubmission } from "@/lib/types/game";
+import type {
+  Card,
+  Difficulty,
+  PuzzleHistoryEntry,
+  HistorySubmission,
+} from "@/lib/types/game";
 import { toCanonicalSignature } from "@/lib/game/signature";
 
 const HISTORY_STORAGE_KEY = "zero-rush.puzzleHistory";
@@ -50,7 +55,8 @@ function generateId(): string {
  */
 export function usePuzzleHistory(): UsePuzzleHistoryReturn {
   const [entries, setEntries] = useState<PuzzleHistoryEntry[]>([]);
-  const [settings, setSettings] = useState<PuzzleHistorySettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] =
+    useState<PuzzleHistorySettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load history from localStorage on mount
@@ -89,7 +95,9 @@ export function usePuzzleHistory(): UsePuzzleHistoryReturn {
 
       setEntries((prev) => {
         // Check for duplicate by signature - merge if found
-        const existingIndex = prev.findIndex((e) => e.signature === entry.signature);
+        const existingIndex = prev.findIndex(
+          (e) => e.signature === entry.signature
+        );
         if (existingIndex !== -1) {
           // Merge: keep favorite status, update other fields
           const existing = prev[existingIndex];
@@ -208,6 +216,7 @@ export function createHistoryEntry(data: {
   dawnSubmission?: { arrangement: Card[]; result: number };
   source: "generated" | "shared";
   sharedFromUrl?: string;
+  hintsUsed?: { dusk: number; dawn: number; total: number };
 }): Omit<PuzzleHistoryEntry, "id"> {
   const submissions: HistorySubmission[] = [];
 
@@ -253,5 +262,6 @@ export function createHistoryEntry(data: {
     isFavorite: false,
     source: data.source,
     sharedFromUrl: data.sharedFromUrl,
+    hintsUsed: data.hintsUsed,
   };
 }
