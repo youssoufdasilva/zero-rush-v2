@@ -12,3 +12,5 @@ export { VictoryModal, VictoryBanner } from "./victory-modal";
 export { PuzzleHistory } from "./puzzle-history";
 export { PuzzleHistoryItem } from "./puzzle-history-item";
 export { SharedPuzzleGame } from "./shared-puzzle-game";
+export { RevealPopover } from "./reveal-popover";
+export { SlotGrid } from "./slot-grid";

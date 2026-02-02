@@ -7,9 +7,9 @@
  * - Wordle: Compact format showing what was found
  */
 
-import type { Card, Difficulty, SharePreset } from './types/game';
-import { getShareUrl } from './puzzle-url';
-import { OPERATOR_DISPLAY } from './game/constants';
+import type { Card, Difficulty, SharePreset } from "./types/game";
+import { getShareUrl } from "./puzzle-url";
+import { OPERATOR_DISPLAY } from "./game/constants";
 
 export interface ShareMessageOptions {
   cards: Card[];
@@ -21,6 +21,12 @@ export interface ShareMessageOptions {
   attempts: number;
   duskArrangement?: Card[];
   dawnArrangement?: Card[];
+  /** Hints used during this puzzle session */
+  hintsUsed?: {
+    dusk: number;
+    dawn: number;
+    total: number;
+  };
 }
 
 /**
@@ -31,7 +37,7 @@ function formatEquation(arrangement: Card[]): string {
     .map((c, i) =>
       i === 0 ? `${c.value}` : `${OPERATOR_DISPLAY[c.operator]}${c.value}`
     )
-    .join(' ');
+    .join(" ");
 }
 
 /**
@@ -39,10 +45,10 @@ function formatEquation(arrangement: Card[]): string {
  */
 function getDifficultyLabel(difficulty: Difficulty): string {
   const labels: Record<Difficulty, string> = {
-    easy: '4 cards',
-    medium: '6 cards',
-    hard: '8 cards',
-    challenger: '10 cards',
+    easy: "4 cards",
+    medium: "6 cards",
+    hard: "8 cards",
+    challenger: "10 cards",
   };
   return labels[difficulty];
 }
@@ -67,7 +73,9 @@ export function generateChallengeMessage(options: ShareMessageOptions): string {
   const url = getShareUrl(cards, difficulty);
   const cardLabel = getDifficultyLabel(difficulty);
 
-  return `Can you solve this Zero Rush puzzle?\n${cardLabel} - ${capitalize(difficulty)} difficulty\n${url}`;
+  return `Can you solve this Zero Rush puzzle?\n${cardLabel} - ${capitalize(
+    difficulty
+  )} difficulty\n${url}`;
 }
 
 /**
@@ -78,24 +86,43 @@ export function generateChallengeMessage(options: ShareMessageOptions): string {
  * [link]"
  */
 export function generateTeaserMessage(options: ShareMessageOptions): string {
-  const { cards, difficulty, duskValue, dawnValue, foundDusk, foundDawn } = options;
+  const {
+    cards,
+    difficulty,
+    duskValue,
+    dawnValue,
+    foundDusk,
+    foundDawn,
+    hintsUsed,
+  } = options;
   const url = getShareUrl(cards, difficulty);
 
   const parts: string[] = [];
 
+  const hintsNote =
+    hintsUsed && hintsUsed.total > 0
+      ? ` (with ${hintsUsed.total} hint${hintsUsed.total === 1 ? "" : "s"})`
+      : "";
+
   if (foundDusk && foundDawn) {
-    parts.push(`I found dusk (${duskValue}) and dawn (${dawnValue}) - can you?`);
+    parts.push(
+      `I found dusk (${duskValue}) and dawn (${dawnValue})${hintsNote} - can you?`
+    );
   } else if (foundDusk) {
-    parts.push(`I found dusk (${duskValue}) - can you find dawn too?`);
+    parts.push(
+      `I found dusk (${duskValue})${hintsNote} - can you find dawn too?`
+    );
   } else if (foundDawn) {
-    parts.push(`I found dawn (${dawnValue}) - can you find dusk too?`);
+    parts.push(
+      `I found dawn (${dawnValue})${hintsNote} - can you find dusk too?`
+    );
   } else {
     parts.push(`Can you find dusk and dawn?`);
   }
 
   parts.push(url);
 
-  return parts.join('\n');
+  return parts.join("\n");
 }
 
 /**
@@ -104,17 +131,23 @@ export function generateTeaserMessage(options: ShareMessageOptions): string {
  * Format:
  * "Zero Rush
  * Dusk ✔️ | Dawn ✔️
- * Attempts: 5
+ * Attempts: 5 (2 hints)
  * [link]"
  */
 export function generateWordleMessage(options: ShareMessageOptions): string {
-  const { cards, difficulty, foundDusk, foundDawn, attempts } = options;
+  const { cards, difficulty, foundDusk, foundDawn, attempts, hintsUsed } =
+    options;
   const url = getShareUrl(cards, difficulty);
 
-  const duskStatus = foundDusk ? '✔️' : '❌';
-  const dawnStatus = foundDawn ? '✔️' : '❌';
+  const duskStatus = foundDusk ? "✔️" : "❌";
+  const dawnStatus = foundDawn ? "✔️" : "❌";
 
-  return `Zero Rush\nDusk ${duskStatus} | Dawn ${dawnStatus}\nAttempts: ${attempts}\n${url}`;
+  const hintsText =
+    hintsUsed && hintsUsed.total > 0
+      ? ` (${hintsUsed.total} hint${hintsUsed.total === 1 ? "" : "s"})`
+      : "";
+
+  return `Zero Rush\nDusk ${duskStatus} | Dawn ${dawnStatus}\nAttempts: ${attempts}${hintsText}\n${url}`;
 }
 
 /**
@@ -125,11 +158,11 @@ export function generateShareMessage(
   options: ShareMessageOptions
 ): string {
   switch (preset) {
-    case 'challenge':
+    case "challenge":
       return generateChallengeMessage(options);
-    case 'teaser':
+    case "teaser":
       return generateTeaserMessage(options);
-    case 'wordle':
+    case "wordle":
       return generateWordleMessage(options);
     default:
       return generateChallengeMessage(options);
@@ -141,9 +174,9 @@ export function generateShareMessage(
  */
 export function getPresetLabel(preset: SharePreset): string {
   const labels: Record<SharePreset, string> = {
-    challenge: 'Challenge',
-    teaser: 'Teaser',
-    wordle: 'Wordle',
+    challenge: "Challenge",
+    teaser: "Teaser",
+    wordle: "Wordle",
   };
   return labels[preset];
 }
@@ -153,9 +186,9 @@ export function getPresetLabel(preset: SharePreset): string {
  */
 export function getPresetDescription(preset: SharePreset): string {
   const descriptions: Record<SharePreset, string> = {
-    challenge: 'Invite friends to try the puzzle',
-    teaser: 'Hint at the targets to intrigue them',
-    wordle: 'Compact format showing your results',
+    challenge: "Invite friends to try the puzzle",
+    teaser: "Hint at the targets to intrigue them",
+    wordle: "Compact format showing your results",
   };
   return descriptions[preset];
 }

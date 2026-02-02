@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { GameSettings } from "./game-board";
+import type { HintMode, MaxHintLimit } from "@/lib/types/game";
 import { cn } from "@/lib/utils";
 
 export interface SettingsDialogProps {
@@ -10,7 +11,10 @@ export interface SettingsDialogProps {
   onSettingsChange: (settings: GameSettings) => void;
 }
 
-export function SettingsDialog({ settings, onSettingsChange }: SettingsDialogProps) {
+export function SettingsDialog({
+  settings,
+  onSettingsChange,
+}: SettingsDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -54,7 +58,7 @@ export function SettingsDialog({ settings, onSettingsChange }: SettingsDialogPro
               <div className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-2">
                 Gameplay
               </div>
-              
+
               {/* Show target values toggle */}
               <SettingToggle
                 label="Show Target Values"
@@ -65,13 +69,18 @@ export function SettingsDialog({ settings, onSettingsChange }: SettingsDialogPro
                 }
               />
 
-              {/* Directional hints toggle */}
-              <SettingToggle
-                label="Directional Hints"
-                description="Show arrows indicating which way to aim"
-                checked={settings.showDirectionalHints}
-                onChange={(checked) =>
-                  onSettingsChange({ ...settings, showDirectionalHints: checked })
+              {/* Hint Mode */}
+              <SettingOptionGroup
+                label="Hint Display"
+                description="What hints to show for targets"
+                value={settings.hintMode}
+                options={[
+                  { value: "disabled", label: "Disabled" },
+                  { value: "directions", label: "Directions" },
+                  { value: "reveals", label: "Directions & Reveals" },
+                ]}
+                onChange={(value) =>
+                  onSettingsChange({ ...settings, hintMode: value as HintMode })
                 }
               />
 
@@ -140,7 +149,10 @@ export function SettingsDialog({ settings, onSettingsChange }: SettingsDialogPro
                   { value: "icons-only", label: "Icons Only" },
                 ]}
                 onChange={(value) =>
-                  onSettingsChange({ ...settings, controlsStyle: value as "text-icons" | "icons-only" })
+                  onSettingsChange({
+                    ...settings,
+                    controlsStyle: value as "text-icons" | "icons-only",
+                  })
                 }
               />
 
@@ -154,7 +166,10 @@ export function SettingsDialog({ settings, onSettingsChange }: SettingsDialogPro
                   { value: "drawer", label: "Side Drawer" },
                 ]}
                 onChange={(value) =>
-                  onSettingsChange({ ...settings, historyPlacement: value as "inline" | "drawer" })
+                  onSettingsChange({
+                    ...settings,
+                    historyPlacement: value as "inline" | "drawer",
+                  })
                 }
               />
 
@@ -190,7 +205,14 @@ export function SettingsDialog({ settings, onSettingsChange }: SettingsDialogPro
                   { value: "both", label: "Both" },
                 ]}
                 onChange={(value) =>
-                  onSettingsChange({ ...settings, autoOrganization: value as "off" | "hand" | "table" | "both" })
+                  onSettingsChange({
+                    ...settings,
+                    autoOrganization: value as
+                      | "off"
+                      | "hand"
+                      | "table"
+                      | "both",
+                  })
                 }
               />
 
@@ -202,6 +224,14 @@ export function SettingsDialog({ settings, onSettingsChange }: SettingsDialogPro
                 options={[5, 10, 15, 20]}
                 onChange={(value) =>
                   onSettingsChange({ ...settings, maxHistoryLength: value })
+                }
+              />
+
+              {/* Admin Section - collapsible */}
+              <AdminSection
+                maxHintLimit={settings.maxHintLimit}
+                onMaxHintLimitChange={(value) =>
+                  onSettingsChange({ ...settings, maxHintLimit: value })
                 }
               />
             </div>
@@ -219,7 +249,12 @@ interface SettingToggleProps {
   onChange: (checked: boolean) => void;
 }
 
-function SettingToggle({ label, description, checked, onChange }: SettingToggleProps) {
+function SettingToggle({
+  label,
+  description,
+  checked,
+  onChange,
+}: SettingToggleProps) {
   return (
     <div className="flex items-center justify-between gap-4">
       <div>
@@ -254,7 +289,13 @@ interface SettingSelectProps {
   onChange: (value: number) => void;
 }
 
-function SettingSelect({ label, description, value, options, onChange }: SettingSelectProps) {
+function SettingSelect({
+  label,
+  description,
+  value,
+  options,
+  onChange,
+}: SettingSelectProps) {
   return (
     <div className="flex items-center justify-between gap-4">
       <div>
@@ -287,7 +328,13 @@ interface SettingOptionGroupProps {
   onChange: (value: string) => void;
 }
 
-function SettingOptionGroup({ label, description, value, options, onChange }: SettingOptionGroupProps) {
+function SettingOptionGroup({
+  label,
+  description,
+  value,
+  options,
+  onChange,
+}: SettingOptionGroupProps) {
   return (
     <div className="flex items-center justify-between gap-4">
       <div>
@@ -311,6 +358,66 @@ function SettingOptionGroup({ label, description, value, options, onChange }: Se
         ))}
       </div>
     </div>
+  );
+}
+
+interface AdminSectionProps {
+  maxHintLimit: MaxHintLimit;
+  onMaxHintLimitChange: (value: MaxHintLimit) => void;
+}
+
+function AdminSection({
+  maxHintLimit,
+  onMaxHintLimitChange,
+}: AdminSectionProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="border-t pt-4 mt-4">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground tracking-wider hover:text-foreground transition-colors w-full"
+      >
+        <ChevronRightIcon
+          className={cn(
+            "w-4 h-4 transition-transform",
+            isExpanded && "rotate-90"
+          )}
+        />
+        Game Admin
+      </button>
+
+      {isExpanded && (
+        <div className="mt-4 space-y-4">
+          <SettingOptionGroup
+            label="Max Hints per Target"
+            description="How many solution cards can be revealed"
+            value={maxHintLimit}
+            options={[
+              { value: "half", label: "Half the cards" },
+              { value: "all", label: "Nearly all (n-2)" },
+            ]}
+            onChange={(value) => onMaxHintLimitChange(value as MaxHintLimit)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChevronRightIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
   );
 }
 

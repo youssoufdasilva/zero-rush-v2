@@ -7,7 +7,7 @@
 // =============================================================================
 
 /** Valid operators for cards */
-export type Operator = '+' | '-' | '*' | '÷';
+export type Operator = "+" | "-" | "*" | "÷";
 
 /** A single card with an operator and value */
 export interface Card {
@@ -23,6 +23,29 @@ export type Slot = Card | null;
 
 /** Auto-organization mode for hand/table zones */
 export type AutoOrgMode = "off" | "hand" | "table" | "both";
+
+/** Hint display mode */
+export type HintMode = "disabled" | "directions" | "reveals";
+
+/** Maximum hint limit setting */
+export type MaxHintLimit = "half" | "all";
+
+/** State for solution reveals/hints */
+export interface HintState {
+  /** Revealed cards for dusk solution */
+  dusk: Card[];
+  /** Revealed cards for dawn solution */
+  dawn: Card[];
+  /** Currently active target being hinted (null = no active hints displayed) */
+  activeTarget: "dusk" | "dawn" | null;
+}
+
+/** A hinted card with its position in the solution */
+export interface HintedCard {
+  card: Card;
+  position: number;
+  theme: "dusk" | "dawn";
+}
 
 // =============================================================================
 // Puzzle Types
@@ -85,7 +108,7 @@ export interface Puzzle {
 // =============================================================================
 
 /** Available difficulty levels */
-export type Difficulty = 'easy' | 'medium' | 'hard' | 'challenger';
+export type Difficulty = "easy" | "medium" | "hard" | "challenger";
 
 /** Configuration for a difficulty level */
 export interface DifficultyConfig {
@@ -104,7 +127,7 @@ export interface DifficultyConfig {
 // =============================================================================
 
 /** Available game modes */
-export type GameMode = 'daily' | 'practice' | 'multiplayer';
+export type GameMode = "daily" | "practice" | "multiplayer";
 
 // =============================================================================
 // Game Record Types (Analytics)
@@ -161,15 +184,20 @@ export interface GameRecord {
 // =============================================================================
 
 /** Quality classification for puzzle UI */
-export type PuzzleQuality = 'perfect' | 'hasZero' | 'isGood' | 'playable' | 'invalid';
+export type PuzzleQuality =
+  | "perfect"
+  | "hasZero"
+  | "isGood"
+  | "playable"
+  | "invalid";
 
 /** Get quality classification from puzzle result */
 export function getPuzzleQuality(result: PuzzleResult): PuzzleQuality {
-  if (!result.hasValidAnswers) return 'invalid';
-  if (result.hasZero && result.isGood) return 'perfect';
-  if (result.hasZero) return 'hasZero';
-  if (result.isGood) return 'isGood';
-  return 'playable';
+  if (!result.hasValidAnswers) return "invalid";
+  if (result.hasZero && result.isGood) return "perfect";
+  if (result.hasZero) return "hasZero";
+  if (result.isGood) return "isGood";
+  return "playable";
 }
 
 // =============================================================================
@@ -177,13 +205,19 @@ export function getPuzzleQuality(result: PuzzleResult): PuzzleQuality {
 // =============================================================================
 
 /** Room state in multiplayer */
-export type RoomState = 'waiting' | 'starting' | 'thinking' | 'reveal' | 'scoring' | 'finished';
+export type RoomState =
+  | "waiting"
+  | "starting"
+  | "thinking"
+  | "reveal"
+  | "scoring"
+  | "finished";
 
 /** Zero mode setting */
-export type ZeroMode = 'guaranteed' | 'open';
+export type ZeroMode = "guaranteed" | "open";
 
 /** Room visibility */
-export type RoomVisibility = 'private' | 'public';
+export type RoomVisibility = "private" | "public";
 
 /** Multiplayer room configuration */
 export interface RoomConfig {
@@ -220,22 +254,22 @@ export interface UserProfile {
   id: string;
   displayName: string;
   createdAt: number;
-  
+
   /** Settings */
   settings: UserSettings;
-  
+
   /** Stats */
   stats: UserStats;
-  
+
   /** Currency */
   gemBalance: number;
-  
+
   /** Streaks */
   currentStreak: number;
   longestStreak: number;
   streakSavesUsed: number;
   lastDailyCompletedAt?: number;
-  
+
   /** Challenger unlock */
   challengerUnlocked: boolean;
   challengerUnlockedAt?: number;
@@ -250,8 +284,8 @@ export interface UserSettings {
   };
   soundEffects: boolean;
   hapticFeedback: boolean;
-  theme: 'light' | 'dark' | 'system';
-  relockChallenger: 'never' | '1h' | '1d' | '3d' | '1w' | '2w';
+  theme: "light" | "dark" | "system";
+  relockChallenger: "never" | "1h" | "1d" | "3d" | "1w" | "2w";
 }
 
 /** User statistics */
@@ -269,19 +303,19 @@ export interface UserStats {
 // =============================================================================
 
 /** Reason for earning/spending gems */
-export type TransactionReason = 
-  | 'streak_milestone'
-  | 'puzzle_submission'
-  | 'hint'
-  | 'skin'
-  | 'streak_save'
-  | 'purchase';
+export type TransactionReason =
+  | "streak_milestone"
+  | "puzzle_submission"
+  | "hint"
+  | "skin"
+  | "streak_save"
+  | "purchase";
 
 /** Gem transaction record */
 export interface Transaction {
   id: string;
   userId: string;
-  type: 'earn' | 'spend';
+  type: "earn" | "spend";
   amount: number;
   reason: TransactionReason;
   metadata?: Record<string, unknown>;
@@ -297,7 +331,14 @@ export interface Transaction {
 // =============================================================================
 
 /** Share message preset types */
-export type SharePreset = 'challenge' | 'teaser' | 'wordle';
+export type SharePreset = "challenge" | "teaser" | "wordle";
+
+/** Hints used during a puzzle session */
+export interface HintsUsed {
+  dusk: number;
+  dawn: number;
+  total: number;
+}
 
 /** A submission stored in puzzle history */
 export interface HistorySubmission {
@@ -338,9 +379,11 @@ export interface PuzzleHistoryEntry {
   /** Whether this puzzle is favorited */
   isFavorite: boolean;
   /** Source of the puzzle */
-  source: 'generated' | 'shared';
+  source: "generated" | "shared";
   /** Original URL if puzzle was shared */
   sharedFromUrl?: string;
+  /** Hints used during this puzzle */
+  hintsUsed?: HintsUsed;
 }
 
 // =============================================================================
@@ -354,15 +397,15 @@ export interface DailyPuzzle {
   difficulty: Difficulty;
   puzzleSignature: string;
   cards: Card[];
-  
+
   /** Pre-calculated answers for validation */
   duskValue: number;
   dawnValue: number;
-  
+
   /** Quality metrics */
   hasZero: boolean;
   isGood: boolean;
-  
+
   /** Optional attribution */
   submittedBy?: string;
 }
@@ -373,11 +416,11 @@ export interface DailyCompletion {
   userId: string;
   date: string;
   difficulty: Difficulty;
-  
+
   completed: boolean;
   attempts: number;
   hintsUsed: number;
   durationMs: number;
-  
+
   completedAt?: number;
 }

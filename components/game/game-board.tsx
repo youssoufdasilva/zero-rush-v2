@@ -18,9 +18,18 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-import type { Difficulty, AutoOrgMode, Card } from "@/lib/types/game";
+import type {
+  Difficulty,
+  AutoOrgMode,
+  Card,
+  HintMode,
+  MaxHintLimit,
+} from "@/lib/types/game";
 import { useGame } from "@/lib/hooks/use-game";
-import { usePuzzleHistory, createHistoryEntry } from "@/lib/hooks/use-puzzle-history";
+import {
+  usePuzzleHistory,
+  createHistoryEntry,
+} from "@/lib/hooks/use-puzzle-history";
 import { GameCard } from "./game-card";
 import { Hand } from "./hand";
 import { TargetDisplay } from "./target-display";
@@ -28,6 +37,7 @@ import { SettingsDialog } from "./settings-dialog";
 import { SubmissionHistory } from "./submission-history";
 import { VictoryModal, VictoryBanner } from "./victory-modal";
 import { SlotGrid } from "./slot-grid";
+import { RevealPopover } from "./reveal-popover";
 import { cardToString } from "@/lib/game/evaluate";
 import { OPERATOR_DISPLAY } from "@/lib/game/constants";
 import { cn } from "@/lib/utils";
@@ -35,7 +45,7 @@ import { useSoundEffects } from "@/lib/hooks/use-sound-effects";
 
 export interface GameSettings {
   showTargetValues: boolean;
-  showDirectionalHints: boolean;
+  hintMode: HintMode;
   autoSubmit: boolean;
   maxHistoryLength: number;
   highlightMatches: boolean;
@@ -47,11 +57,12 @@ export interface GameSettings {
   autoOrganization: AutoOrgMode;
   enableHandDrag: boolean;
   autoSaveHistory: boolean;
+  maxHintLimit: MaxHintLimit;
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
   showTargetValues: false,
-  showDirectionalHints: true,
+  hintMode: "reveals",
   autoSubmit: false,
   maxHistoryLength: 10,
   highlightMatches: false,
@@ -63,6 +74,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   autoOrganization: "hand",
   enableHandDrag: false,
   autoSaveHistory: true,
+  maxHintLimit: "half",
 };
 const SETTINGS_STORAGE_KEY = "zero-rush.gameSettings";
 
@@ -92,6 +104,10 @@ export function GameBoard({
   const [shakeSubmit, setShakeSubmit] = useState(false);
   const [flashHistory, setFlashHistory] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [revealPopoverTarget, setRevealPopoverTarget] = useState<
+    "dusk" | "dawn" | null
+  >(null);
+  const [pulseClearButton, setPulseClearButton] = useState(false);
   const submitButtonRef = useRef<HTMLButtonElement>(null);
   const autoSubmitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevCanSubmitRef = useRef(false);
@@ -115,6 +131,7 @@ export function GameBoard({
     rawResult,
     isComplete,
     submissions,
+    hints,
     generateNewPuzzle,
     addToArrangement,
     removeFromArrangement,
@@ -130,6 +147,9 @@ export function GameBoard({
     removeFromTableAtSlot,
     swapWithinTable,
     swapWithinHand,
+    revealNextHint,
+    clearHints,
+    getHintedCards,
   } = useGame({ difficulty, providedCards });
 
   // Detect mobile viewport
@@ -164,10 +184,16 @@ export function GameBoard({
         foundDusk,
         foundDawn,
         duskSubmission: duskSubmission
-          ? { arrangement: duskSubmission.arrangement, result: duskSubmission.result }
+          ? {
+              arrangement: duskSubmission.arrangement,
+              result: duskSubmission.result,
+            }
           : undefined,
         dawnSubmission: dawnSubmission
-          ? { arrangement: dawnSubmission.arrangement, result: dawnSubmission.result }
+          ? {
+              arrangement: dawnSubmission.arrangement,
+              result: dawnSubmission.result,
+            }
           : undefined,
         source: puzzleSource,
         sharedFromUrl,
@@ -216,15 +242,30 @@ export function GameBoard({
       if (!stored) {
         // First time - set default based on difficulty
         if (difficulty === "challenger") {
-          setSettings((prev) => ({ ...prev, showDirectionalHints: false }));
+          setSettings((prev) => ({ ...prev, hintMode: "disabled" }));
         }
         return;
       }
-      const parsed = JSON.parse(stored) as Partial<GameSettings>;
+      const parsed = JSON.parse(stored) as Partial<GameSettings> & {
+        showDirectionalHints?: boolean;
+      };
       if (parsed && typeof parsed === "object") {
-        // If showDirectionalHints not explicitly set and Challenger, default to false
-        if (parsed.showDirectionalHints === undefined && difficulty === "challenger") {
-          parsed.showDirectionalHints = false;
+        // Migrate from old showDirectionalHints to new hintMode
+        if (
+          parsed.hintMode === undefined &&
+          parsed.showDirectionalHints !== undefined
+        ) {
+          parsed.hintMode = parsed.showDirectionalHints
+            ? "reveals"
+            : "disabled";
+        }
+        // If hintMode not explicitly set and Challenger, default to disabled
+        if (parsed.hintMode === undefined && difficulty === "challenger") {
+          parsed.hintMode = "disabled";
+        }
+        // Set default maxHintLimit if not present
+        if (parsed.maxHintLimit === undefined) {
+          parsed.maxHintLimit = "half";
         }
         setSettings((prev) => ({ ...prev, ...parsed }));
       }
@@ -262,6 +303,20 @@ export function GameBoard({
       highest: Math.max(...values),
     };
   }, [submissions]);
+
+  // Calculate max hints based on settings
+  const maxHints = useMemo(() => {
+    if (settings.maxHintLimit === "all") {
+      return Math.max(cardCount - 2, 1); // Nearly all (n-2), min 1
+    }
+    return Math.floor(cardCount / 2); // Half the cards
+  }, [cardCount, settings.maxHintLimit]);
+
+  // Get hinted cards for display
+  const hintedCards = useMemo(() => getHintedCards(), [getHintedCards]);
+
+  // Whether hints are currently active
+  const hasActiveHints = hints.activeTarget !== null && hintedCards.length > 0;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -390,15 +445,50 @@ export function GameBoard({
   );
 
   const handleClear = useCallback(() => {
+    // If hints are active, first clear hints
+    if (hasActiveHints) {
+      play("clear");
+      clearHints();
+      return;
+    }
+    // Normal clear behavior
     if (arrangementCards.length === 0) return;
     play("clear");
     clearArrangement();
-  }, [arrangementCards.length, clearArrangement, play]);
+  }, [
+    arrangementCards.length,
+    clearArrangement,
+    play,
+    hasActiveHints,
+    clearHints,
+  ]);
 
   const handleNewPuzzle = useCallback(() => {
     play("newPuzzle");
     generateNewPuzzle();
+    setRevealPopoverTarget(null);
   }, [generateNewPuzzle, play]);
+
+  // Handle reveal popover actions
+  const handleRevealClick = useCallback(
+    (target: "dusk" | "dawn") => {
+      if (settings.hintMode !== "reveals") return;
+      setRevealPopoverTarget(target);
+    },
+    [settings.hintMode]
+  );
+
+  const handleReveal = useCallback(() => {
+    if (!revealPopoverTarget) return;
+    revealNextHint(revealPopoverTarget);
+  }, [revealPopoverTarget, revealNextHint]);
+
+  // Handle attempted interaction with hinted card
+  const handleHintedCardInteraction = useCallback(() => {
+    // Pulse the clear button to indicate user should clear hints first
+    setPulseClearButton(true);
+    setTimeout(() => setPulseClearButton(false), 600);
+  }, []);
 
   // Auto-submit when enabled and ready
   useEffect(() => {
@@ -498,6 +588,19 @@ export function GameBoard({
         puzzleCards={puzzleCards}
       />
 
+      {/* Reveal Popover */}
+      {revealPopoverTarget && (
+        <RevealPopover
+          isOpen={true}
+          onClose={() => setRevealPopoverTarget(null)}
+          target={revealPopoverTarget}
+          revealedCount={hints[revealPopoverTarget].length}
+          totalCards={cardCount}
+          maxHints={maxHints}
+          onReveal={handleReveal}
+        />
+      )}
+
       {/* History Drawer (when in drawer mode) */}
       {settings.historyPlacement === "drawer" && (
         <HistoryDrawer
@@ -510,7 +613,7 @@ export function GameBoard({
         />
       )}
 
-      <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-4 min-h-svh border border-dashed border-red-500">
+      <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-4 min-h-svh">
         {/* Header with back button and settings */}
         <div className="flex items-center justify-between w-full mb-4">
           <button
@@ -565,7 +668,10 @@ export function GameBoard({
             found={foundDusk}
             showValue={settings.showTargetValues}
             bestAttempt={bestAttempts.lowest}
-            showHint={settings.showDirectionalHints}
+            hintMode={settings.hintMode}
+            hintCount={hints.dusk.length}
+            maxHints={maxHints}
+            onRevealClick={() => handleRevealClick("dusk")}
           />
           <TargetDisplay
             type="dawn"
@@ -573,7 +679,10 @@ export function GameBoard({
             found={foundDawn}
             showValue={settings.showTargetValues}
             bestAttempt={bestAttempts.highest}
-            showHint={settings.showDirectionalHints}
+            hintMode={settings.hintMode}
+            hintCount={hints.dawn.length}
+            maxHints={maxHints}
+            onRevealClick={() => handleRevealClick("dawn")}
           />
         </div>
 
@@ -612,13 +721,19 @@ export function GameBoard({
             /* Slot-based rendering */
             <div
               className={cn(
-                "p-3 sm:p-4 rounded-2xl bg-muted/30 border w-full",
+                "p-3 sm:p-4 rounded-2xl border w-full transition-all duration-300",
                 shouldScaleCards
                   ? "min-h-[80px]"
-                  : "min-h-[100px] sm:min-h-[120px]"
+                  : "min-h-[100px] sm:min-h-[120px]",
+                // Theme based on active hint target
+                hints.activeTarget === "dusk" &&
+                  "bg-sky-500/10 border-sky-500/50",
+                hints.activeTarget === "dawn" &&
+                  "bg-amber-500/10 border-amber-500/50",
+                !hints.activeTarget && "bg-muted/30 border-border"
               )}
             >
-                <SlotGrid
+              <SlotGrid
                 slots={tableSlots}
                 totalSlots={cardCount}
                 zone="table"
@@ -627,6 +742,8 @@ export function GameBoard({
                 disabled={isComplete}
                 isTableZone={true}
                 size={shouldScaleCards ? "small" : "hand"}
+                hintedCards={hintedCards}
+                onHintedCardInteraction={handleHintedCardInteraction}
               />
             </div>
           ) : (
@@ -704,6 +821,9 @@ export function GameBoard({
             hasArrangement={arrangementCards.length > 0}
             controlsStyle={settings.controlsStyle}
             shakeSubmit={shakeSubmit}
+            hasActiveHints={hasActiveHints}
+            hintTheme={hints.activeTarget}
+            pulseClearButton={pulseClearButton}
             ref={submitButtonRef}
           />
         </div>
@@ -746,6 +866,9 @@ interface GameControlsCompactProps {
   hasArrangement: boolean;
   controlsStyle: "text-icons" | "icons-only";
   shakeSubmit: boolean;
+  hasActiveHints: boolean;
+  hintTheme: "dusk" | "dawn" | null;
+  pulseClearButton: boolean;
 }
 
 const GameControlsCompact = ({
@@ -758,25 +881,48 @@ const GameControlsCompact = ({
   hasArrangement,
   controlsStyle,
   shakeSubmit,
+  hasActiveHints,
+  hintTheme,
+  pulseClearButton,
 }: GameControlsCompactProps & { ref?: React.Ref<HTMLButtonElement> }) => {
   const showText = controlsStyle === "text-icons";
+
+  // Clear button can be activated when there's arrangement OR active hints
+  const clearEnabled = (hasArrangement || hasActiveHints) && !isComplete;
 
   return (
     <div className="flex items-center gap-2">
       <button
         onClick={onClear}
-        disabled={!hasArrangement || isComplete}
+        disabled={!clearEnabled}
         className={cn(
           "flex items-center justify-center gap-1.5",
-          "h-10 px-3 rounded-lg border border-input bg-background",
-          "hover:bg-accent hover:text-accent-foreground",
-          "disabled:opacity-50 disabled:pointer-events-none",
-          "transition-colors"
+          "h-10 px-3 rounded-lg border transition-all",
+          // Default styling
+          !hasActiveHints &&
+            "border-input bg-background hover:bg-accent hover:text-accent-foreground",
+          // Hint mode styling - themed background
+          hasActiveHints &&
+            hintTheme === "dusk" &&
+            "border-sky-500 bg-sky-500 text-white hover:bg-sky-600 shadow-lg shadow-sky-500/30",
+          hasActiveHints &&
+            hintTheme === "dawn" &&
+            "border-amber-500 bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/30",
+          "disabled:opacity-50 disabled:pointer-events-none"
         )}
-        title="Clear"
+        style={
+          pulseClearButton
+            ? { animation: "pulse 0.3s ease-in-out 2" }
+            : undefined
+        }
+        title={hasActiveHints ? "Clear Hint" : "Clear"}
       >
         <ClearIcon className="w-4 h-4" />
-        {showText && <span className="text-sm">Clear</span>}
+        {showText && (
+          <span className="text-sm">
+            {hasActiveHints ? "Clear Hint" : "Clear"}
+          </span>
+        )}
       </button>
 
       <button

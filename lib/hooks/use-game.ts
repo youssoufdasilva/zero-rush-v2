@@ -1,8 +1,19 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import type { Card, Difficulty, PuzzleResult, Slot, AutoOrgMode } from "@/lib/types/game";
-import { findGoodPuzzleForDifficulty, generateAnswers } from "@/lib/game/generate";
+import type {
+  Card,
+  Difficulty,
+  PuzzleResult,
+  Slot,
+  AutoOrgMode,
+  HintState,
+  HintedCard,
+} from "@/lib/types/game";
+import {
+  findGoodPuzzleForDifficulty,
+  generateAnswers,
+} from "@/lib/game/generate";
 import { evaluate, isValidAnswer, cardToString } from "@/lib/game/evaluate";
 import { DIFFICULTY_CONFIG } from "@/lib/game/constants";
 
@@ -28,7 +39,7 @@ export interface Submission {
 
 /** Generate signature for an arrangement to detect duplicates */
 function getArrangementSignature(arrangement: Card[]): string {
-  return arrangement.map(card => cardToString(card)).join("");
+  return arrangement.map((card) => cardToString(card)).join("");
 }
 
 export interface GameState {
@@ -58,6 +69,8 @@ export interface GameState {
   isComplete: boolean;
   /** Submission history */
   submissions: Submission[];
+  /** Hint state for solution reveals */
+  hints: HintState;
 }
 
 export interface UseGameReturn extends GameState {
@@ -72,7 +85,12 @@ export interface UseGameReturn extends GameState {
   /** Reorder cards within arrangement (from drag and drop) */
   reorderArrangement: (newOrder: Card[]) => void;
   /** Submit current arrangement as an attempt */
-  submitAttempt: () => { isDusk: boolean; isDawn: boolean; isDuplicate: boolean; value: number | null };
+  submitAttempt: () => {
+    isDusk: boolean;
+    isDawn: boolean;
+    isDuplicate: boolean;
+    value: number | null;
+  };
   /** Clear arrangement, return all cards to hand */
   clearArrangement: () => void;
   /** Reset the game to initial state */
@@ -101,6 +119,14 @@ export interface UseGameReturn extends GameState {
   swapWithinTable: (fromIndex: number, toIndex: number) => void;
   /** Swap two slots within the hand */
   swapWithinHand: (fromIndex: number, toIndex: number) => void;
+  /** Reveal the next hint card for the specified target */
+  revealNextHint: (target: "dusk" | "dawn") => void;
+  /** Clear all active hints and restore normal mode */
+  clearHints: () => void;
+  /** Get currently active hinted cards with their positions */
+  getHintedCards: () => HintedCard[];
+  /** Check if a card in the table is a hinted card (locked) */
+  isHintedCard: (card: Card, index: number) => boolean;
 }
 
 function createInitialPuzzle(difficulty: Difficulty): {
@@ -126,7 +152,9 @@ export interface UseGameOptions {
   providedCards?: Card[];
 }
 
-export function useGame(initialDifficultyOrOptions: Difficulty | UseGameOptions = "medium"): UseGameReturn {
+export function useGame(
+  initialDifficultyOrOptions: Difficulty | UseGameOptions = "medium"
+): UseGameReturn {
   // Handle both old signature (just difficulty) and new options object
   const options: UseGameOptions =
     typeof initialDifficultyOrOptions === "string"
@@ -157,21 +185,28 @@ export function useGame(initialDifficultyOrOptions: Difficulty | UseGameOptions 
   const [foundDawn, setFoundDawn] = useState(false);
   const [attempts, setAttempts] = useState(0);
 
+  // Hint state for solution reveals
+  const [hints, setHints] = useState<HintState>({
+    dusk: [],
+    dawn: [],
+    activeTarget: null,
+  });
+
   const isComplete = foundDusk && foundDawn;
 
-  const cardCount = useMemo(() =>
-    DIFFICULTY_CONFIG[difficulty].cards,
+  const cardCount = useMemo(
+    () => DIFFICULTY_CONFIG[difficulty].cards,
     [difficulty]
   );
 
   // Derived state: filtered cards for backward compatibility
-  const handCards = useMemo(() =>
-    handSlots.filter((slot): slot is Card => slot != null),
+  const handCards = useMemo(
+    () => handSlots.filter((slot): slot is Card => slot != null),
     [handSlots]
   );
 
-  const arrangementCards = useMemo(() =>
-    tableSlots.filter((slot): slot is Card => slot != null),
+  const arrangementCards = useMemo(
+    () => tableSlots.filter((slot): slot is Card => slot != null),
     [tableSlots]
   );
 
@@ -207,57 +242,66 @@ export function useGame(initialDifficultyOrOptions: Difficulty | UseGameOptions 
     setFoundDusk(false);
     setFoundDawn(false);
     setAttempts(0);
+    setHints({ dusk: [], dawn: [], activeTarget: null });
   }, [difficulty]);
 
-  const addToArrangement = useCallback((card: Card) => {
-    setHandSlots((prev) => {
-      const index = prev.findIndex(
-        (c) => c !== null && c.operator === card.operator && c.value === card.value
-      );
-      if (index === -1) return prev;
-      if (handAutoOrg) {
-        // Auto-organize: remove the slot entirely
-        return [...prev.slice(0, index), ...prev.slice(index + 1)];
-      } else {
-        // Leave null gap
-        const newSlots = [...prev];
-        newSlots[index] = null;
-        return newSlots;
-      }
-    });
-    setTableSlots((prev) => [...prev, card]);
-  }, [handAutoOrg]);
+  const addToArrangement = useCallback(
+    (card: Card) => {
+      setHandSlots((prev) => {
+        const index = prev.findIndex(
+          (c) =>
+            c !== null && c.operator === card.operator && c.value === card.value
+        );
+        if (index === -1) return prev;
+        if (handAutoOrg) {
+          // Auto-organize: remove the slot entirely
+          return [...prev.slice(0, index), ...prev.slice(index + 1)];
+        } else {
+          // Leave null gap
+          const newSlots = [...prev];
+          newSlots[index] = null;
+          return newSlots;
+        }
+      });
+      setTableSlots((prev) => [...prev, card]);
+    },
+    [handAutoOrg]
+  );
 
-  const removeFromArrangement = useCallback((card: Card) => {
-    setTableSlots((prev) => {
-      const index = prev.findIndex(
-        (c) => c !== null && c.operator === card.operator && c.value === card.value
-      );
-      if (index === -1) return prev;
-      if (tableAutoOrg) {
-        // Auto-organize: remove the slot entirely
-        return [...prev.slice(0, index), ...prev.slice(index + 1)];
-      } else {
-        // Leave null gap
-        const newSlots = [...prev];
-        newSlots[index] = null;
-        return newSlots;
-      }
-    });
-    // Add card back to hand - find first empty slot or append
-    setHandSlots((prev) => {
-      if (handAutoOrg) {
+  const removeFromArrangement = useCallback(
+    (card: Card) => {
+      setTableSlots((prev) => {
+        const index = prev.findIndex(
+          (c) =>
+            c !== null && c.operator === card.operator && c.value === card.value
+        );
+        if (index === -1) return prev;
+        if (tableAutoOrg) {
+          // Auto-organize: remove the slot entirely
+          return [...prev.slice(0, index), ...prev.slice(index + 1)];
+        } else {
+          // Leave null gap
+          const newSlots = [...prev];
+          newSlots[index] = null;
+          return newSlots;
+        }
+      });
+      // Add card back to hand - find first empty slot or append
+      setHandSlots((prev) => {
+        if (handAutoOrg) {
+          return [...prev, card];
+        }
+        const emptyIndex = prev.findIndex((s) => s === null);
+        if (emptyIndex !== -1) {
+          const newSlots = [...prev];
+          newSlots[emptyIndex] = card;
+          return newSlots;
+        }
         return [...prev, card];
-      }
-      const emptyIndex = prev.findIndex((s) => s === null);
-      if (emptyIndex !== -1) {
-        const newSlots = [...prev];
-        newSlots[emptyIndex] = card;
-        return newSlots;
-      }
-      return [...prev, card];
-    });
-  }, [tableAutoOrg, handAutoOrg]);
+      });
+    },
+    [tableAutoOrg, handAutoOrg]
+  );
 
   const reorderArrangement = useCallback((newOrder: Card[]) => {
     setTableSlots(newOrder);
@@ -273,7 +317,11 @@ export function useGame(initialDifficultyOrOptions: Difficulty | UseGameOptions 
       // Fill in empty slots first, then append
       const newSlots = [...prev];
       let returnIndex = 0;
-      for (let i = 0; i < newSlots.length && returnIndex < cardsToReturn.length; i++) {
+      for (
+        let i = 0;
+        i < newSlots.length && returnIndex < cardsToReturn.length;
+        i++
+      ) {
         if (newSlots[i] === null) {
           newSlots[i] = cardsToReturn[returnIndex++];
         }
@@ -288,72 +336,82 @@ export function useGame(initialDifficultyOrOptions: Difficulty | UseGameOptions 
   }, [tableSlots, handAutoOrg]);
 
   // Slot-based operations
-  const addToTableAtSlot = useCallback((handIndex: number, tableIndex?: number) => {
-    const card = handSlots[handIndex];
-    if (!card) return; // Handle both null and undefined (out of bounds)
+  const addToTableAtSlot = useCallback(
+    (handIndex: number, tableIndex?: number) => {
+      const card = handSlots[handIndex];
+      if (!card) return; // Handle both null and undefined (out of bounds)
 
-    // Remove from hand
-    setHandSlots((prev) => {
-      if (handAutoOrg) {
-        return [...prev.slice(0, handIndex), ...prev.slice(handIndex + 1)];
-      }
-      const newSlots = [...prev];
-      newSlots[handIndex] = null;
-      return newSlots;
-    });
+      // Remove from hand
+      setHandSlots((prev) => {
+        if (handAutoOrg) {
+          return [...prev.slice(0, handIndex), ...prev.slice(handIndex + 1)];
+        }
+        const newSlots = [...prev];
+        newSlots[handIndex] = null;
+        return newSlots;
+      });
 
-    // Add to table
-    setTableSlots((prev) => {
-      if (tableIndex !== undefined && tableIndex >= 0) {
-        // Insert at specific index
-        if (tableIndex < prev.length && prev[tableIndex] === null) {
-          // Fill empty slot
+      // Add to table
+      setTableSlots((prev) => {
+        if (tableIndex !== undefined && tableIndex >= 0) {
+          // Insert at specific index
+          if (tableIndex < prev.length && prev[tableIndex] === null) {
+            // Fill empty slot
+            const newSlots = [...prev];
+            newSlots[tableIndex] = card;
+            return newSlots;
+          }
+          // Insert at position
+          return [
+            ...prev.slice(0, tableIndex),
+            card,
+            ...prev.slice(tableIndex),
+          ];
+        }
+        // Find first empty slot or append
+        const emptyIndex = prev.findIndex((s) => s === null);
+        if (emptyIndex !== -1) {
           const newSlots = [...prev];
-          newSlots[tableIndex] = card;
+          newSlots[emptyIndex] = card;
           return newSlots;
         }
-        // Insert at position
-        return [...prev.slice(0, tableIndex), card, ...prev.slice(tableIndex)];
-      }
-      // Find first empty slot or append
-      const emptyIndex = prev.findIndex((s) => s === null);
-      if (emptyIndex !== -1) {
-        const newSlots = [...prev];
-        newSlots[emptyIndex] = card;
-        return newSlots;
-      }
-      return [...prev, card];
-    });
-  }, [handSlots, handAutoOrg]);
-
-  const removeFromTableAtSlot = useCallback((tableIndex: number) => {
-    const card = tableSlots[tableIndex];
-    if (!card) return; // Handle both null and undefined (out of bounds)
-
-    // Remove from table
-    setTableSlots((prev) => {
-      if (tableAutoOrg) {
-        return [...prev.slice(0, tableIndex), ...prev.slice(tableIndex + 1)];
-      }
-      const newSlots = [...prev];
-      newSlots[tableIndex] = null;
-      return newSlots;
-    });
-
-    // Add back to hand
-    setHandSlots((prev) => {
-      if (handAutoOrg) {
         return [...prev, card];
-      }
-      const emptyIndex = prev.findIndex((s) => s === null);
-      if (emptyIndex !== -1) {
+      });
+    },
+    [handSlots, handAutoOrg]
+  );
+
+  const removeFromTableAtSlot = useCallback(
+    (tableIndex: number) => {
+      const card = tableSlots[tableIndex];
+      if (!card) return; // Handle both null and undefined (out of bounds)
+
+      // Remove from table
+      setTableSlots((prev) => {
+        if (tableAutoOrg) {
+          return [...prev.slice(0, tableIndex), ...prev.slice(tableIndex + 1)];
+        }
         const newSlots = [...prev];
-        newSlots[emptyIndex] = card;
+        newSlots[tableIndex] = null;
         return newSlots;
-      }
-      return [...prev, card];
-    });
-  }, [tableSlots, tableAutoOrg, handAutoOrg]);
+      });
+
+      // Add back to hand
+      setHandSlots((prev) => {
+        if (handAutoOrg) {
+          return [...prev, card];
+        }
+        const emptyIndex = prev.findIndex((s) => s === null);
+        if (emptyIndex !== -1) {
+          const newSlots = [...prev];
+          newSlots[emptyIndex] = card;
+          return newSlots;
+        }
+        return [...prev, card];
+      });
+    },
+    [tableSlots, tableAutoOrg, handAutoOrg]
+  );
 
   const swapWithinTable = useCallback((fromIndex: number, toIndex: number) => {
     setTableSlots((prev) => {
@@ -375,6 +433,117 @@ export function useGame(initialDifficultyOrOptions: Difficulty | UseGameOptions 
     });
   }, []);
 
+  // Reveal next hint card for the specified target
+  const revealNextHint = useCallback(
+    (target: "dusk" | "dawn") => {
+      const solution =
+        target === "dusk"
+          ? puzzleData.puzzleResult.dusk.arrangement
+          : puzzleData.puzzleResult.dawn.arrangement;
+
+      setHints((prev) => {
+        const currentReveals = prev[target];
+        const nextIndex = currentReveals.length;
+
+        // If we've already revealed all cards, do nothing
+        if (nextIndex >= solution.length) {
+          return prev;
+        }
+
+        const nextCard = solution[nextIndex];
+
+        // If switching targets, we need to update the table
+        if (prev.activeTarget !== target) {
+          // Clear the table and move cards to hand when switching targets
+          // This is handled in the game board component
+        }
+
+        return {
+          ...prev,
+          [target]: [...currentReveals, nextCard],
+          activeTarget: target,
+        };
+      });
+
+      // When switching targets or starting hints, clear table and place hinted cards
+      setHints((prev) => {
+        if (prev.activeTarget === target) {
+          return prev; // Already handled above
+        }
+        return prev;
+      });
+    },
+    [puzzleData.puzzleResult]
+  );
+
+  // Clear all active hints
+  const clearHints = useCallback(() => {
+    // Return hinted cards from table to hand and clear hint state
+    const activeHints = hints.activeTarget ? hints[hints.activeTarget] : [];
+
+    if (activeHints.length > 0) {
+      // Remove hinted cards from table and return to hand
+      setTableSlots((prev) => {
+        const hintedCount = activeHints.length;
+        // Remove the first N cards (which are the hinted ones)
+        return prev.slice(hintedCount);
+      });
+
+      setHandSlots((prev) => {
+        if (handAutoOrg) {
+          return [...prev.filter((s): s is Card => s !== null), ...activeHints];
+        }
+        // Fill in empty slots
+        const newSlots = [...prev];
+        let hintIndex = 0;
+        for (
+          let i = 0;
+          i < newSlots.length && hintIndex < activeHints.length;
+          i++
+        ) {
+          if (newSlots[i] === null) {
+            newSlots[i] = activeHints[hintIndex++];
+          }
+        }
+        // Append remaining hints
+        while (hintIndex < activeHints.length) {
+          newSlots.push(activeHints[hintIndex++]);
+        }
+        return newSlots;
+      });
+    }
+
+    setHints({
+      dusk: hints.dusk, // Preserve progress
+      dawn: hints.dawn, // Preserve progress
+      activeTarget: null,
+    });
+  }, [hints, handAutoOrg]);
+
+  // Get currently active hinted cards with positions
+  const getHintedCards = useCallback((): HintedCard[] => {
+    if (!hints.activeTarget) return [];
+
+    const activeHints = hints[hints.activeTarget];
+    return activeHints.map((card, index) => ({
+      card,
+      position: index + 1, // 1-indexed for display
+      theme: hints.activeTarget!,
+    }));
+  }, [hints]);
+
+  // Check if a card in the table is a hinted card
+  const isHintedCard = useCallback(
+    (card: Card, index: number): boolean => {
+      if (!hints.activeTarget) return false;
+
+      const activeHints = hints[hints.activeTarget];
+      // Hinted cards are placed at the beginning of the table
+      return index < activeHints.length;
+    },
+    [hints]
+  );
+
   const submitAttempt = useCallback(() => {
     if (handCards.length > 0) {
       // Not all cards placed
@@ -383,8 +552,10 @@ export function useGame(initialDifficultyOrOptions: Difficulty | UseGameOptions 
 
     // Check for duplicate submission
     const currentSignature = getArrangementSignature(arrangementCards);
-    const isDuplicate = submissions.some(sub => sub.signature === currentSignature);
-    
+    const isDuplicate = submissions.some(
+      (sub) => sub.signature === currentSignature
+    );
+
     if (isDuplicate) {
       // Don't count as attempt, just signal duplicate
       return { isDusk: false, isDawn: false, isDuplicate: true, value: null };
@@ -393,12 +564,14 @@ export function useGame(initialDifficultyOrOptions: Difficulty | UseGameOptions 
     const result = evaluate(arrangementCards);
     const answer = result.answer;
     const isValid = isValidAnswer(answer);
-    
-    setAttempts(prev => prev + 1);
-    
-    const isDusk = isValid && answer === puzzleData.puzzleResult.dusk.result && !foundDusk;
-    const isDawn = isValid && answer === puzzleData.puzzleResult.dawn.result && !foundDawn;
-    
+
+    setAttempts((prev) => prev + 1);
+
+    const isDusk =
+      isValid && answer === puzzleData.puzzleResult.dusk.result && !foundDusk;
+    const isDawn =
+      isValid && answer === puzzleData.puzzleResult.dawn.result && !foundDawn;
+
     // Create submission record
     const submission: Submission = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -410,23 +583,36 @@ export function useGame(initialDifficultyOrOptions: Difficulty | UseGameOptions 
       isInvalid: !isValid,
       timestamp: Date.now(),
     };
-    
+
     // Add to history (limited by maxHistoryLength)
-    setSubmissions(prev => {
+    setSubmissions((prev) => {
       const newSubmissions = [submission, ...prev];
       return newSubmissions.slice(0, maxHistoryLength);
     });
-    
+
     if (isDusk) {
       setFoundDusk(true);
     }
-    
+
     if (isDawn) {
       setFoundDawn(true);
     }
-    
-    return { isDusk, isDawn, isDuplicate: false, value: isValid ? answer : null };
-  }, [arrangementCards, handCards.length, puzzleData.puzzleResult, foundDusk, foundDawn, maxHistoryLength, submissions]);
+
+    return {
+      isDusk,
+      isDawn,
+      isDuplicate: false,
+      value: isValid ? answer : null,
+    };
+  }, [
+    arrangementCards,
+    handCards.length,
+    puzzleData.puzzleResult,
+    foundDusk,
+    foundDawn,
+    maxHistoryLength,
+    submissions,
+  ]);
 
   const resetGame = useCallback(() => {
     setHandSlots(puzzleData.cards);
@@ -435,6 +621,7 @@ export function useGame(initialDifficultyOrOptions: Difficulty | UseGameOptions 
     setFoundDusk(false);
     setFoundDawn(false);
     setAttempts(0);
+    setHints({ dusk: [], dawn: [], activeTarget: null });
   }, [puzzleData.cards]);
 
   return {
@@ -452,6 +639,7 @@ export function useGame(initialDifficultyOrOptions: Difficulty | UseGameOptions 
     rawResult,
     isComplete,
     submissions,
+    hints,
     generateNewPuzzle,
     addToArrangement,
     removeFromArrangement,
@@ -471,5 +659,9 @@ export function useGame(initialDifficultyOrOptions: Difficulty | UseGameOptions 
     removeFromTableAtSlot,
     swapWithinTable,
     swapWithinHand,
+    revealNextHint,
+    clearHints,
+    getHintedCards,
+    isHintedCard,
   };
 }

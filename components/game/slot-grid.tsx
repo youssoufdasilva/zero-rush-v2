@@ -17,7 +17,7 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 
-import type { Card, Slot } from "@/lib/types/game";
+import type { Card, Slot, HintedCard } from "@/lib/types/game";
 import { calculateRowDistribution } from "@/lib/game/layout";
 import { cardToString } from "@/lib/game/evaluate";
 import { CardSlot } from "./card-slot";
@@ -40,6 +40,10 @@ export interface SlotGridProps {
   isTableZone?: boolean;
   /** Size variant */
   size?: "normal" | "small" | "hand";
+  /** Hinted cards with their positions (for table zone) */
+  hintedCards?: HintedCard[];
+  /** Callback when user attempts to interact with a hinted card */
+  onHintedCardInteraction?: () => void;
 }
 
 export function SlotGrid({
@@ -51,6 +55,8 @@ export function SlotGrid({
   disabled = false,
   isTableZone = false,
   size = "normal",
+  hintedCards = [],
+  onHintedCardInteraction,
 }: SlotGridProps) {
   // Calculate row distribution
   const [topRowCount] = useMemo(
@@ -122,13 +128,26 @@ export function SlotGrid({
       slot !== null &&
       paddedSlots.filter((s): s is Card => s !== null).indexOf(slot) === 0;
 
+    // Check if this is a hinted card position
+    const hintedCard = hintedCards.find((h) => h.position - 1 === index); // Convert 1-indexed to 0-indexed
+    const isHinted = !!hintedCard;
+
+    const handleSlotClick = () => {
+      if (isHinted && onHintedCardInteraction) {
+        // Trigger feedback when user tries to interact with hinted card
+        onHintedCardInteraction();
+        return;
+      }
+      onSlotClick(index);
+    };
+
     return (
       <CardSlot
         key={slotId}
         id={slotId}
         isEmpty={isEmpty}
         size={size}
-        onClick={isEmpty ? () => onSlotClick(index) : undefined}
+        onClick={isEmpty ? handleSlotClick : undefined}
       >
         {slot && (
           <GameCard
@@ -136,9 +155,11 @@ export function SlotGrid({
             card={slot}
             isFirst={isFirst}
             disabled={disabled}
-            draggable={!disabled && !!onDragEnd}
-            onClick={() => onSlotClick(index)}
+            draggable={!disabled && !!onDragEnd && !isHinted}
+            onClick={handleSlotClick}
             size={size}
+            hintPosition={hintedCard?.position}
+            hintTheme={hintedCard?.theme}
           />
         )}
       </CardSlot>
