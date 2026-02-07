@@ -144,7 +144,7 @@ export function GameBoard({
   sharedFromUrl,
 }: GameBoardProps) {
   const [settings, setSettings] = useState<GameSettings>(() => getInitialSettings(difficulty));
-  const [showVictoryModal, setShowVictoryModal] = useState(isComplete);
+  const [showVictoryModal, setShowVictoryModal] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [shakeSubmit, setShakeSubmit] = useState(false);
   const [flashHistory, setFlashHistory] = useState(false);
@@ -207,14 +207,16 @@ export function GameBoard({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Track completion state changes via ref to avoid setState in effect cascade
-  if (isComplete && !prevCompleteRef.current) {
-    prevCompleteRef.current = true;
-    // Use microtask to avoid synchronous setState during render cascade
-    queueMicrotask(() => setShowVictoryModal(true));
-  } else if (!isComplete) {
-    prevCompleteRef.current = false;
-  }
+  // Track completion state changes and show victory modal
+  useEffect(() => {
+    if (isComplete && !prevCompleteRef.current) {
+      prevCompleteRef.current = true;
+      // Use queueMicrotask to avoid synchronous setState
+      queueMicrotask(() => setShowVictoryModal(true));
+    } else if (!isComplete && prevCompleteRef.current) {
+      prevCompleteRef.current = false;
+    }
+  }, [isComplete]);
 
   // Save to history when puzzle is completed
   useEffect(() => {
@@ -698,8 +700,6 @@ export function GameBoard({
             showValue={settings.showTargetValues}
             bestAttempt={bestAttempts.lowest}
             hintMode={settings.hintMode}
-            hintCount={hints.dusk.length}
-            maxHints={maxHints}
             onRevealClick={() => handleRevealClick("dusk")}
           />
           <TargetDisplay
@@ -709,8 +709,6 @@ export function GameBoard({
             showValue={settings.showTargetValues}
             bestAttempt={bestAttempts.highest}
             hintMode={settings.hintMode}
-            hintCount={hints.dawn.length}
-            maxHints={maxHints}
             onRevealClick={() => handleRevealClick("dawn")}
           />
         </div>
