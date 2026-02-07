@@ -163,10 +163,18 @@ export function VictoryModal({
     [updateShareText]
   );
 
-  // Trigger canvas confetti when modal opens
+  // Trigger canvas confetti when modal opens - initial burst + 2 more after 1s each
   useEffect(() => {
     if (isOpen) {
       fireConfetti();
+      // Second burst after 1 second
+      const timer1 = setTimeout(() => fireConfetti(), 1000);
+      // Third burst after 2 seconds
+      const timer2 = setTimeout(() => fireConfetti(), 2000);
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
     }
   }, [isOpen]);
 
