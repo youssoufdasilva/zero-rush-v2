@@ -17,7 +17,7 @@ import type {
   PuzzleResult, 
   Target 
 } from '../types/game';
-import { evaluate, isValidAnswer, cardToString } from './evaluate';
+import { evaluate, isValidAnswer } from './evaluate';
 import { toCanonicalSignature } from './signature';
 import { 
   DIFFICULTY_CONFIG, 
@@ -25,7 +25,6 @@ import {
   QUALITY_THRESHOLD,
   MAX_GENERATION_ATTEMPTS,
   RELAXED_QUALITY_THRESHOLD,
-  OPERATORS,
 } from './constants';
 
 // =============================================================================

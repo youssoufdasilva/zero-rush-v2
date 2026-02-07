@@ -464,9 +464,6 @@ export function useGame(
         // All hinted cards for this target (including the new one)
         const allHintsForTarget = [...currentReveals, nextCard];
 
-        // Get all puzzle cards to identify non-hinted ones
-        const allPuzzleCards = puzzleData.cards;
-
         // Clear table and return only NON-hinted cards to hand
         setTableSlots((tableState) => {
           const tableCards = tableState.filter((s): s is Card => s !== null);
@@ -554,7 +551,7 @@ export function useGame(
         };
       });
     },
-    [puzzleData.puzzleResult, puzzleData.cards, handAutoOrg, isSameCard]
+    [puzzleData.puzzleResult, handAutoOrg, isSameCard]
   );
 
   // Resume showing hints for a target without revealing a new card

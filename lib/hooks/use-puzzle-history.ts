@@ -50,30 +50,30 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function getInitialEntries(): PuzzleHistoryEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch {
+    // Ignore malformed storage
+  }
+  return [];
+}
+
 /**
  * Hook for managing puzzle history with localStorage persistence
  */
 export function usePuzzleHistory(): UsePuzzleHistoryReturn {
-  const [entries, setEntries] = useState<PuzzleHistoryEntry[]>([]);
+  const [entries, setEntries] = useState<PuzzleHistoryEntry[]>(getInitialEntries);
   const [settings, setSettings] =
     useState<PuzzleHistorySettings>(DEFAULT_SETTINGS);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Load history from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setEntries(parsed);
-        }
-      }
-    } catch {
-      // Ignore malformed storage
-    }
-    setIsLoading(false);
-  }, []);
+  const isLoading = false;
 
   // Persist history to localStorage
   useEffect(() => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { PuzzleHistoryEntry, SharePreset } from "@/lib/types/game";
+import type { PuzzleHistoryEntry } from "@/lib/types/game";
 import { cn } from "@/lib/utils";
 import { generateShareMessage } from "@/lib/share-messages";
 import { OPERATOR_DISPLAY } from "@/lib/game/constants";
@@ -45,13 +45,6 @@ function formatRelativeDate(timestamp: number): string {
     month: "short",
     day: "numeric",
   });
-}
-
-/**
- * Capitalize first letter
- */
-function capitalize(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 export function PuzzleHistoryItem({

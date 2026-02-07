@@ -16,8 +16,6 @@ export interface GameControlsProps {
   isComplete: boolean;
   /** Whether submit is allowed (all cards placed, valid result) */
   canSubmit: boolean;
-  /** Current result value (for auto-submit) */
-  currentResult: number | null;
   /** Whether there are cards in arrangement to clear */
   hasArrangement: boolean;
   /** Whether auto-submit is enabled */
@@ -33,7 +31,6 @@ export function GameControls({
   attempts,
   isComplete,
   canSubmit,
-  currentResult,
   hasArrangement,
   autoSubmit = false,
   autoSubmitDelay = 500,

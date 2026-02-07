@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Difficulty } from "@/lib/types/game";
 import { DIFFICULTY_CONFIG } from "@/lib/game/constants";
 import { Button } from "@/components/ui/button";
@@ -16,21 +16,19 @@ export interface HomeScreenProps {
 const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard", "challenger"];
 const LAST_DIFFICULTY_KEY = "zero-rush.lastDifficulty";
 
+function getInitialDifficulty(): Difficulty {
+  if (typeof window === "undefined") return "medium";
+  const stored = localStorage.getItem(LAST_DIFFICULTY_KEY);
+  const isValid =
+    stored &&
+    DIFFICULTIES.includes(stored as Difficulty) &&
+    stored !== "challenger";
+  return isValid ? (stored as Difficulty) : "medium";
+}
+
 export function HomeScreen({ onStart, onHistory }: HomeScreenProps) {
   const [selectedDifficulty, setSelectedDifficulty] =
-    useState<Difficulty>("medium");
-
-  useEffect(() => {
-    const stored = localStorage.getItem(LAST_DIFFICULTY_KEY);
-    const isValid =
-      stored &&
-      DIFFICULTIES.includes(stored as Difficulty) &&
-      stored !== "challenger";
-
-    if (isValid) {
-      setSelectedDifficulty(stored as Difficulty);
-    }
-  }, []);
+    useState<Difficulty>(getInitialDifficulty);
 
   const handleStart = () => {
     localStorage.setItem(LAST_DIFFICULTY_KEY, selectedDifficulty);

@@ -9,16 +9,10 @@ import { cn } from "@/lib/utils";
 export interface SubmissionHistoryProps {
   /** List of submissions (newest first) */
   submissions: Submission[];
-  /** Dusk target value */
-  duskValue: number;
-  /** Dawn target value */
-  dawnValue: number;
 }
 
 export function SubmissionHistory({ 
-  submissions, 
-  duskValue, 
-  dawnValue 
+  submissions 
 }: SubmissionHistoryProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -41,8 +35,6 @@ export function SubmissionHistory({
                 <SubmissionEntry
                   key={submission.id}
                   submission={submission}
-                  duskValue={duskValue}
-                  dawnValue={dawnValue}
                 />
               ))}
             </div>
@@ -74,11 +66,9 @@ function ChevronIcon({ className }: { className?: string }) {
 
 interface SubmissionEntryProps {
   submission: Submission;
-  duskValue: number;
-  dawnValue: number;
 }
 
-function SubmissionEntry({ submission, duskValue, dawnValue }: SubmissionEntryProps) {
+function SubmissionEntry({ submission }: SubmissionEntryProps) {
   const { arrangement, result, isDusk, isDawn, isInvalid } = submission;
   
   // Determine the color coding

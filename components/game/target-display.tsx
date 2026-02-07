@@ -16,10 +16,6 @@ export interface TargetDisplayProps {
   bestAttempt: number | null;
   /** Whether to show directional arrow hints (deprecated, use hintMode) */
   showHint?: boolean;
-  /** How many hints revealed for this target */
-  hintCount?: number;
-  /** Maximum hints allowed */
-  maxHints?: number;
   /** Triggered when user clicks the best attempt area */
   onRevealClick?: () => void;
   /** Hint display mode */
@@ -33,8 +29,6 @@ export function TargetDisplay({
   showValue = false,
   bestAttempt,
   showHint = true,
-  hintCount = 0,
-  maxHints = 0,
   onRevealClick,
   hintMode = "reveals",
 }: TargetDisplayProps) {

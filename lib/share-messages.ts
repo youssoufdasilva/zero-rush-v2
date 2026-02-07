@@ -9,7 +9,6 @@
 
 import type { Card, Difficulty, SharePreset } from "./types/game";
 import { getShareUrl } from "./puzzle-url";
-import { OPERATOR_DISPLAY } from "./game/constants";
 
 export interface ShareMessageOptions {
   cards: Card[];
@@ -32,14 +31,6 @@ export interface ShareMessageOptions {
 /**
  * Format a card arrangement as an equation string
  */
-function formatEquation(arrangement: Card[]): string {
-  return arrangement
-    .map((c, i) =>
-      i === 0 ? `${c.value}` : `${OPERATOR_DISPLAY[c.operator]}${c.value}`
-    )
-    .join(" ");
-}
-
 /**
  * Get a label for difficulty
  */

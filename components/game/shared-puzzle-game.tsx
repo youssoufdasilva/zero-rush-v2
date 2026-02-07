@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useEffect } from "react";
+import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Card, Difficulty } from "@/lib/types/game";
 import { GameBoard } from "./game-board";
@@ -23,12 +23,8 @@ export function SharedPuzzleGame({
   difficulty,
 }: SharedPuzzleGameProps) {
   const router = useRouter();
-  const [sharedFromUrl, setSharedFromUrl] = useState<string | undefined>();
-
-  // Capture the URL on client side
-  useEffect(() => {
-    setSharedFromUrl(window.location.href);
-  }, []);
+  // Capture URL directly without setState in effect
+  const sharedFromUrl = typeof window !== "undefined" ? window.location.href : undefined;
 
   const handleBack = useCallback(() => {
     router.push("/");

@@ -76,6 +76,51 @@ const DEFAULT_SETTINGS: GameSettings = {
   autoSaveHistory: true,
   maxHintLimit: "half",
 };
+
+function getInitialSettings(difficulty: Difficulty): GameSettings {
+  if (typeof window === "undefined") {
+    return {
+      ...DEFAULT_SETTINGS,
+      hintMode: difficulty === "challenger" ? "disabled" : "reveals",
+    };
+  }
+  try {
+    const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!stored) {
+      return {
+        ...DEFAULT_SETTINGS,
+        hintMode: difficulty === "challenger" ? "disabled" : "reveals",
+      };
+    }
+    const parsed = JSON.parse(stored) as Partial<GameSettings> & {
+      showDirectionalHints?: boolean;
+    };
+    if (parsed && typeof parsed === "object") {
+      // Migrate from old showDirectionalHints to new hintMode
+      if (
+        parsed.hintMode === undefined &&
+        parsed.showDirectionalHints !== undefined
+      ) {
+        parsed.hintMode = parsed.showDirectionalHints ? "reveals" : "disabled";
+      }
+      // If hintMode not explicitly set and Challenger, default to disabled
+      if (parsed.hintMode === undefined && difficulty === "challenger") {
+        parsed.hintMode = "disabled";
+      }
+      // Set default maxHintLimit if not present
+      if (parsed.maxHintLimit === undefined) {
+        parsed.maxHintLimit = "half";
+      }
+      return { ...DEFAULT_SETTINGS, ...parsed };
+    }
+  } catch {
+    // Ignore errors
+  }
+  return {
+    ...DEFAULT_SETTINGS,
+    hintMode: difficulty === "challenger" ? "disabled" : "reveals",
+  };
+};
 const SETTINGS_STORAGE_KEY = "zero-rush.gameSettings";
 
 export interface GameBoardProps {
@@ -98,8 +143,8 @@ export function GameBoard({
   puzzleSource = "generated",
   sharedFromUrl,
 }: GameBoardProps) {
-  const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
-  const [showVictoryModal, setShowVictoryModal] = useState(false);
+  const [settings, setSettings] = useState<GameSettings>(() => getInitialSettings(difficulty));
+  const [showVictoryModal, setShowVictoryModal] = useState(isComplete);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [shakeSubmit, setShakeSubmit] = useState(false);
   const [flashHistory, setFlashHistory] = useState(false);
@@ -162,12 +207,14 @@ export function GameBoard({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Show victory modal when puzzle is completed
-  useEffect(() => {
-    if (isComplete) {
-      setShowVictoryModal(true);
-    }
-  }, [isComplete]);
+  // Track completion state changes via ref to avoid setState in effect cascade
+  if (isComplete && !prevCompleteRef.current) {
+    prevCompleteRef.current = true;
+    // Use microtask to avoid synchronous setState during render cascade
+    queueMicrotask(() => setShowVictoryModal(true));
+  } else if (!isComplete) {
+    prevCompleteRef.current = false;
+  }
 
   // Save to history when puzzle is completed
   useEffect(() => {
@@ -242,45 +289,6 @@ export function GameBoard({
   useEffect(() => {
     setUseCardSlots(settings.useCardSlots);
   }, [settings.useCardSlots, setUseCardSlots]);
-
-  // Load settings from localStorage once on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
-      if (!stored) {
-        // First time - set default based on difficulty
-        if (difficulty === "challenger") {
-          setSettings((prev) => ({ ...prev, hintMode: "disabled" }));
-        }
-        return;
-      }
-      const parsed = JSON.parse(stored) as Partial<GameSettings> & {
-        showDirectionalHints?: boolean;
-      };
-      if (parsed && typeof parsed === "object") {
-        // Migrate from old showDirectionalHints to new hintMode
-        if (
-          parsed.hintMode === undefined &&
-          parsed.showDirectionalHints !== undefined
-        ) {
-          parsed.hintMode = parsed.showDirectionalHints
-            ? "reveals"
-            : "disabled";
-        }
-        // If hintMode not explicitly set and Challenger, default to disabled
-        if (parsed.hintMode === undefined && difficulty === "challenger") {
-          parsed.hintMode = "disabled";
-        }
-        // Set default maxHintLimit if not present
-        if (parsed.maxHintLimit === undefined) {
-          parsed.maxHintLimit = "half";
-        }
-        setSettings((prev) => ({ ...prev, ...parsed }));
-      }
-    } catch {
-      // Ignore malformed storage
-    }
-  }, [difficulty]);
 
   // Persist settings to localStorage
   useEffect(() => {
@@ -630,8 +638,6 @@ export function GameBoard({
           isOpen={isDrawerOpen}
           onClose={() => setIsDrawerOpen(false)}
           submissions={submissions}
-          duskValue={puzzleResult.dusk.result}
-          dawnValue={puzzleResult.dawn.result}
           flashHistory={flashHistory}
         />
       )}
@@ -728,8 +734,6 @@ export function GameBoard({
           >
             <SubmissionHistory
               submissions={submissions}
-              duskValue={puzzleResult.dusk.result}
-              dawnValue={puzzleResult.dawn.result}
             />
           </div>
         )}
@@ -996,8 +1000,6 @@ interface HistoryDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   submissions: ReturnType<typeof useGame>["submissions"];
-  duskValue: number;
-  dawnValue: number;
   flashHistory: boolean;
 }
 
@@ -1005,8 +1007,6 @@ function HistoryDrawer({
   isOpen,
   onClose,
   submissions,
-  duskValue,
-  dawnValue,
   flashHistory,
 }: HistoryDrawerProps) {
   if (!isOpen) return null;
@@ -1048,8 +1048,6 @@ function HistoryDrawer({
             ) : (
               <SubmissionHistory
                 submissions={submissions}
-                duskValue={duskValue}
-                dawnValue={dawnValue}
               />
             )}
           </div>

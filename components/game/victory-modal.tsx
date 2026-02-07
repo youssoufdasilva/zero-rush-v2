@@ -144,15 +144,6 @@ export function VictoryModal({
     [puzzleCards, difficulty, duskValue, dawnValue, duskSubmission, dawnSubmission, attempts]
   );
 
-  // Initialize share text when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      updateShareText(selectedPreset);
-      setIsEditing(false);
-      setCopied(false);
-    }
-  }, [isOpen, selectedPreset, updateShareText]);
-
   // Update share text when preset changes
   const handlePresetChange = useCallback(
     (preset: SharePreset) => {

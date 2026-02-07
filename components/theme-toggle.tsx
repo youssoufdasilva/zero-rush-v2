@@ -5,16 +5,20 @@ import { Button } from "@/components/ui/button";
 
 type Theme = "light" | "dark" | "system";
 
+function getInitialTheme(): Theme {
+  if (typeof window === "undefined") return "system";
+  const stored = localStorage.getItem("theme") as Theme | null;
+  return stored ?? "system";
+}
+
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("system");
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // Delay to avoid hydration mismatch - intentional setState in effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
-    const stored = localStorage.getItem("theme") as Theme | null;
-    if (stored) {
-      setTheme(stored);
-    }
   }, []);
 
   useEffect(() => {
