@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Difficulty } from "@/lib/types/game";
 import { DIFFICULTY_CONFIG } from "@/lib/game/constants";
 import { Button } from "@/components/ui/button";
@@ -16,23 +16,45 @@ export interface HomeScreenProps {
 const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard", "challenger"];
 const LAST_DIFFICULTY_KEY = "zero-rush.lastDifficulty";
 
-function getInitialDifficulty(): Difficulty {
-  if (typeof window === "undefined") return "medium";
-  const stored = localStorage.getItem(LAST_DIFFICULTY_KEY);
-  const isValid =
-    stored &&
-    DIFFICULTIES.includes(stored as Difficulty) &&
-    stored !== "challenger";
-  return isValid ? (stored as Difficulty) : "medium";
-}
-
 export function HomeScreen({ onStart, onHistory }: HomeScreenProps) {
-  const [selectedDifficulty, setSelectedDifficulty] =
-    useState<Difficulty>(getInitialDifficulty);
+  const [state, setState] = useState<{
+    selectedDifficulty: Difficulty | null;
+    isHydrated: boolean;
+  }>({
+    selectedDifficulty: null,
+    isHydrated: false,
+  });
+
+  // Hydrate saved difficulty from localStorage after mount
+  useEffect(() => {
+    if (state.isHydrated) return;
+    
+    const stored = localStorage.getItem(LAST_DIFFICULTY_KEY);
+    const isValid =
+      stored &&
+      DIFFICULTIES.includes(stored as Difficulty) &&
+      stored !== "challenger";
+    
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setState({
+      selectedDifficulty: isValid ? (stored as Difficulty) : "medium",
+      isHydrated: true,
+    });
+  }, [state.isHydrated]);
+
+  const { selectedDifficulty, isHydrated } = state;
+
+  const setSelectedDifficulty = (difficulty: Difficulty) => {
+    setState((prev) => ({
+      ...prev,
+      selectedDifficulty: difficulty,
+    }));
+  };
 
   const handleStart = () => {
-    localStorage.setItem(LAST_DIFFICULTY_KEY, selectedDifficulty);
-    onStart(selectedDifficulty);
+    const difficulty = selectedDifficulty || "medium";
+    localStorage.setItem(LAST_DIFFICULTY_KEY, difficulty);
+    onStart(difficulty);
   };
 
   return (
@@ -64,7 +86,7 @@ export function HomeScreen({ onStart, onHistory }: HomeScreenProps) {
                 disabled={isChallenger}
                 className={cn(
                   "flex flex-col items-start gap-1 p-4 rounded-xl border-2 transition-all",
-                  "text-left",
+                  "text-left relative overflow-hidden",
                   isSelected &&
                     !isChallenger &&
                     "border-primary bg-primary/10 shadow-md",
@@ -75,6 +97,11 @@ export function HomeScreen({ onStart, onHistory }: HomeScreenProps) {
                     "opacity-50 cursor-not-allowed border-border bg-muted/30"
                 )}
               >
+                {/* Subtle loading shimmer */}
+                {!isHydrated && !isChallenger && (
+                  <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+                )}
+                
                 <div className="flex items-center gap-2">
                   <span
                     className={cn(
